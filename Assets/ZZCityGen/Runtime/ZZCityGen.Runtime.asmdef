@@ -1,0 +1,14 @@
+{
+  "name": "ZZCityGen.Runtime",
+  "rootNamespace": "ZZCityGen",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

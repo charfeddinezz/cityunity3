@@ -88,6 +88,34 @@ namespace ZZCityGen.Generation
             }
         }
 
+        public void GenerateInfrastructure()
+        {
+            EnsurePlan();
+            EnsureRoot();
+            ClearChildren("Infrastructure");
+            var infrastructureRoot = CreateStageRoot("Infrastructure");
+
+            foreach (var infrastructure in currentPlan.infrastructure)
+            {
+                var marker = GameObject.CreatePrimitive(GetInfrastructurePrimitive(infrastructure.type));
+                marker.name = infrastructure.name;
+                marker.transform.SetParent(infrastructureRoot, false);
+                var footprint = Mathf.Clamp(infrastructure.serviceRadiusMeters * 0.08f, 18f, 160f);
+                var height = GetInfrastructureHeight(infrastructure.type);
+                marker.transform.position = ToWorld(infrastructure.position, height * 0.5f);
+                marker.transform.localScale = new Vector3(footprint, height, footprint);
+            }
+
+            foreach (var landmark in currentPlan.landmarks)
+            {
+                var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                marker.name = landmark.name;
+                marker.transform.SetParent(infrastructureRoot, false);
+                marker.transform.position = ToWorld(landmark.position, landmark.heightMeters * 0.5f);
+                marker.transform.localScale = new Vector3(landmark.footprintMeters.x, landmark.heightMeters, landmark.footprintMeters.y);
+            }
+        }
+
         public void ConfigureSimulation()
         {
             EnsurePlan();
@@ -112,6 +140,7 @@ namespace ZZCityGen.Generation
             GenerateTerrain();
             GenerateCities();
             GenerateTransport();
+            GenerateInfrastructure();
             ConfigureSimulation();
             OptimizeWorld();
         }
@@ -155,11 +184,60 @@ namespace ZZCityGen.Generation
                 instance = GameObject.CreatePrimitive(district.type == DistrictType.PublicPark ? PrimitiveType.Sphere : PrimitiveType.Cube);
                 instance.transform.SetParent(districtRoot, false);
                 instance.name = $"{district.type} Lot";
-                var height = district.type == DistrictType.Business ? Mathf.Lerp(18f, 180f, district.development) : Mathf.Lerp(4f, 42f, district.development);
+                var height = GetDistrictHeight(district);
                 instance.transform.localScale = new Vector3(lotSize.x * 0.65f, height, lotSize.y * 0.65f);
             }
 
             instance.transform.position = ToWorld(position, instance.transform.localScale.y * 0.5f);
+        }
+
+        private float GetDistrictHeight(DistrictPlan district)
+        {
+            switch (district.type)
+            {
+                case DistrictType.Business:
+                    return Mathf.Lerp(18f, 180f, district.development);
+                case DistrictType.Airport:
+                case DistrictType.Port:
+                case DistrictType.FreightTerminal:
+                case DistrictType.Utility:
+                    return Mathf.Lerp(6f, 28f, district.development);
+                case DistrictType.PublicPark:
+                    return Mathf.Lerp(3f, 18f, district.development);
+                default:
+                    return Mathf.Lerp(4f, 42f, district.development);
+            }
+        }
+
+        private PrimitiveType GetInfrastructurePrimitive(InfrastructureType type)
+        {
+            switch (type)
+            {
+                case InfrastructureType.Airport:
+                case InfrastructureType.Port:
+                case InfrastructureType.FreightTerminal:
+                    return PrimitiveType.Cube;
+                case InfrastructureType.PowerPlant:
+                case InfrastructureType.WaterTreatment:
+                    return PrimitiveType.Cylinder;
+                default:
+                    return PrimitiveType.Sphere;
+            }
+        }
+
+        private float GetInfrastructureHeight(InfrastructureType type)
+        {
+            switch (type)
+            {
+                case InfrastructureType.PowerPlant:
+                    return 42f;
+                case InfrastructureType.WaterTreatment:
+                    return 16f;
+                case InfrastructureType.Airport:
+                    return 12f;
+                default:
+                    return 24f;
+            }
         }
 
         private float GetTransportWidth(TransportType type)

@@ -30,9 +30,13 @@ namespace ZZCityGen.Planning
 
             BuildRegions(plan);
             BuildCities(plan);
+            BuildVillages(plan);
             BuildNaturalFeatures(plan);
             BuildTransport(plan);
             BuildEconomy(plan);
+            BuildInfrastructure(plan);
+            BuildLandmarks(plan);
+            BuildMapLayers(plan);
             return plan;
         }
 
@@ -86,6 +90,38 @@ namespace ZZCityGen.Planning
             }
         }
 
+        private void BuildVillages(MasterPlan plan)
+        {
+            if (settings.villageCount <= 0)
+            {
+                return;
+            }
+
+            for (var i = 0; i < settings.villageCount; i++)
+            {
+                var region = plan.regions[random.Next(plan.regions.Count)];
+                var position = new Vector2(
+                    Range(region.bounds.xMin, region.bounds.xMax),
+                    Range(region.bounds.yMin, region.bounds.yMax));
+
+                var nearestCity = FindNearestCity(plan.cities, position);
+                if (nearestCity != null)
+                {
+                    var away = (position - nearestCity.position).normalized;
+                    if (away.sqrMagnitude < 0.01f)
+                    {
+                        away = new Vector2(Range(-1f, 1f), Range(-1f, 1f)).normalized;
+                    }
+
+                    position = ClampToWorld(nearestCity.position + away * Range(nearestCity.radiusMeters * 1.7f, nearestCity.radiusMeters * 3.4f), plan.worldSizeMeters);
+                }
+
+                var population = Mathf.Max(120, Mathf.RoundToInt(settings.targetPopulation * Range(0.00015f, 0.0014f)));
+                var radius = Mathf.Lerp(140f, 620f, settings.urbanDensity) * Range(0.65f, 1.25f);
+                plan.cities.Add(CreateCity(settings.cityCount + i, CityArchetype.Village, position, population, radius));
+            }
+        }
+
         private CityPlan CreateCity(int index, CityArchetype archetype, Vector2 position, int population, float radius)
         {
             var city = new CityPlan
@@ -112,8 +148,11 @@ namespace ZZCityGen.Planning
                     type = type,
                     bounds = new Rect(districtCenter.x - districtSize * 0.5f, districtCenter.y - districtSize * 0.5f, districtSize, districtSize),
                     populationTarget = districtPopulation,
+                    jobsTarget = EstimateDistrictJobs(type, districtPopulation, city.development),
                     density = Mathf.Clamp01(settings.urbanDensity + Range(-0.25f, 0.25f)),
-                    development = city.development
+                    development = city.development,
+                    electricityMegawatts = EstimateElectricity(type, districtPopulation, city.development),
+                    waterMegalitersPerDay = EstimateWater(type, districtPopulation)
                 });
             }
 
@@ -172,6 +211,101 @@ namespace ZZCityGen.Planning
                     }
                 }
             }
+
+            for (var i = 1; i < plan.cities.Count; i++)
+            {
+                var from = plan.cities[i];
+                var to = plan.cities[i == plan.cities.Count - 1 ? 1 : i + 1];
+                if (from.archetype == CityArchetype.Village && random.NextDouble() > 0.35f)
+                {
+                    continue;
+                }
+
+                AddTransport(plan, TransportType.SecondaryRoad, from.position, to.position, $"Secondary Road {from.name} - {to.name}");
+            }
+
+            foreach (var city in plan.cities)
+            {
+                if (city.archetype != CityArchetype.CapitalMegacity && city.archetype != CityArchetype.UniversityCity && city.archetype != CityArchetype.TourismCity)
+                {
+                    continue;
+                }
+
+                for (var i = 0; i < city.districts.Count; i++)
+                {
+                    var next = city.districts[(i + 1) % city.districts.Count];
+                    AddTransport(plan, TransportType.Tram, city.districts[i].bounds.center, next.bounds.center, $"Tram {city.name} Loop {i + 1}");
+                }
+            }
+        }
+
+        private void BuildInfrastructure(MasterPlan plan)
+        {
+            foreach (var city in plan.cities)
+            {
+                foreach (var district in city.districts)
+                {
+                    if (district.type == DistrictType.Airport)
+                    {
+                        AddInfrastructure(plan, InfrastructureType.Airport, city, district.bounds.center, Mathf.RoundToInt(city.populationTarget * 0.9f));
+                    }
+                    else if (district.type == DistrictType.Port)
+                    {
+                        AddInfrastructure(plan, InfrastructureType.Port, city, district.bounds.center, Mathf.RoundToInt(plan.economy.freightTonsPerDay));
+                    }
+                    else if (settings.generateFreightTerminals && district.type == DistrictType.Industrial)
+                    {
+                        AddInfrastructure(plan, InfrastructureType.FreightTerminal, city, district.bounds.center, Mathf.Max(200, district.jobsTarget));
+                    }
+                }
+
+                if (city.archetype == CityArchetype.CapitalMegacity || city.archetype == CityArchetype.IndustrialCity)
+                {
+                    var offset = new Vector2(city.radiusMeters * 0.85f, -city.radiusMeters * 0.65f);
+                    AddInfrastructure(plan, InfrastructureType.PowerPlant, city, ClampToWorld(city.position + offset, plan.worldSizeMeters), Mathf.RoundToInt(city.populationTarget * 0.75f));
+                    AddInfrastructure(plan, InfrastructureType.WaterTreatment, city, ClampToWorld(city.position - offset, plan.worldSizeMeters), Mathf.RoundToInt(city.populationTarget * 0.65f));
+                }
+            }
+        }
+
+        private void BuildLandmarks(MasterPlan plan)
+        {
+            var index = 0;
+            foreach (var city in plan.cities)
+            {
+                if (city.archetype == CityArchetype.Village || random.NextDouble() > settings.landmarkFrequency + city.development * 0.35f)
+                {
+                    continue;
+                }
+
+                foreach (var district in city.districts)
+                {
+                    if (district.type != DistrictType.Business && district.type != DistrictType.Government && district.type != DistrictType.Tourism && district.type != DistrictType.Education && district.type != DistrictType.PublicPark)
+                    {
+                        continue;
+                    }
+
+                    plan.landmarks.Add(new LandmarkPlan
+                    {
+                        name = names.NextLandmarkName(index),
+                        districtType = district.type,
+                        position = district.bounds.center,
+                        footprintMeters = new Vector2(district.bounds.width * 0.22f, district.bounds.height * 0.22f),
+                        heightMeters = district.type == DistrictType.Business ? Mathf.Lerp(90f, 420f, district.development) : Mathf.Lerp(18f, 90f, district.development),
+                        uniqueness = Mathf.Clamp01(city.development + Range(0.05f, 0.35f))
+                    });
+                    index++;
+                    break;
+                }
+            }
+        }
+
+        private void BuildMapLayers(MasterPlan plan)
+        {
+            plan.mapLayers.Add(new MapLayerPlan { name = "World Overview", layerType = "World", elementCount = plan.regions.Count + plan.naturalFeatures.Count });
+            plan.mapLayers.Add(new MapLayerPlan { name = "Road & Rail Map", layerType = "Transport", elementCount = plan.transportLinks.Count });
+            plan.mapLayers.Add(new MapLayerPlan { name = "Settlements Map", layerType = "Cities", elementCount = plan.cities.Count });
+            plan.mapLayers.Add(new MapLayerPlan { name = "Infrastructure Map", layerType = "Infrastructure", elementCount = plan.infrastructure.Count });
         }
 
         private void AddTransport(MasterPlan plan, TransportType type, Vector2 from, Vector2 to, string name)
@@ -196,6 +330,9 @@ namespace ZZCityGen.Planning
             plan.economy.electricityMegawatts = settings.targetPopulation * Mathf.Lerp(0.0012f, 0.0024f, settings.economicDevelopment);
             plan.economy.waterMegalitersPerDay = settings.targetPopulation * 0.00022f;
             plan.economy.freightTonsPerDay = plan.economy.estimatedJobs * Mathf.Lerp(0.018f, 0.05f, settings.economicDevelopment);
+            plan.economy.publicServiceJobs = Mathf.RoundToInt(plan.economy.estimatedJobs * 0.18f);
+            plan.economy.industrialJobs = Mathf.RoundToInt(plan.economy.estimatedJobs * 0.22f);
+            plan.economy.tourismJobs = Mathf.RoundToInt(plan.economy.estimatedJobs * 0.08f);
         }
 
         private List<DistrictType> GetDistrictRecipe(CityArchetype archetype)
@@ -233,8 +370,75 @@ namespace ZZCityGen.Planning
                     recipe.Add(DistrictType.Airport);
                 }
             }
+            else if (archetype == CityArchetype.Village)
+            {
+                recipe.Clear();
+                recipe.AddRange(new[] { DistrictType.PopularResidential, DistrictType.MiddleResidential, DistrictType.PublicPark });
+            }
 
             return recipe;
+        }
+
+        private void AddInfrastructure(MasterPlan plan, InfrastructureType type, CityPlan city, Vector2 position, int capacity)
+        {
+            plan.infrastructure.Add(new InfrastructurePlan
+            {
+                name = names.NextInfrastructureName(type.ToString(), city.name),
+                type = type,
+                position = position,
+                serviceRadiusMeters = Mathf.Max(city.radiusMeters * 2f, 1200f),
+                capacity = Mathf.Max(1, capacity),
+                ownerCityName = city.name
+            });
+        }
+
+        private CityPlan FindNearestCity(List<CityPlan> cities, Vector2 position)
+        {
+            CityPlan nearest = null;
+            var bestDistance = float.MaxValue;
+            foreach (var city in cities)
+            {
+                var distance = Vector2.SqrMagnitude(city.position - position);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    nearest = city;
+                }
+            }
+
+            return nearest;
+        }
+
+        private int EstimateDistrictJobs(DistrictType type, int population, float development)
+        {
+            switch (type)
+            {
+                case DistrictType.Business:
+                    return Mathf.RoundToInt(population * Mathf.Lerp(1.8f, 3.4f, development));
+                case DistrictType.Industrial:
+                case DistrictType.Port:
+                case DistrictType.Airport:
+                case DistrictType.FreightTerminal:
+                    return Mathf.RoundToInt(Mathf.Lerp(450f, 8500f, development));
+                case DistrictType.Education:
+                case DistrictType.Government:
+                case DistrictType.Tourism:
+                    return Mathf.RoundToInt(Mathf.Max(150, population) * Mathf.Lerp(0.35f, 1.2f, development));
+                default:
+                    return Mathf.RoundToInt(population * Mathf.Lerp(0.12f, 0.38f, development));
+            }
+        }
+
+        private float EstimateElectricity(DistrictType type, int population, float development)
+        {
+            var multiplier = type == DistrictType.Business || type == DistrictType.Industrial ? 0.0048f : 0.0016f;
+            return Mathf.Max(0.05f, population * multiplier * Mathf.Lerp(0.75f, 1.8f, development));
+        }
+
+        private float EstimateWater(DistrictType type, int population)
+        {
+            var multiplier = type == DistrictType.PublicPark ? 0.00045f : 0.00022f;
+            return Mathf.Max(0.02f, population * multiplier);
         }
 
         private string PickFeatureType()

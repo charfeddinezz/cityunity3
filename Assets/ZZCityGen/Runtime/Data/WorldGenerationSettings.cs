@@ -27,7 +27,8 @@ namespace ZZCityGen.Data
         IndustrialCity,
         CoastalCity,
         TourismCity,
-        UniversityCity
+        UniversityCity,
+        Village
     }
 
     [Serializable]
@@ -46,6 +47,7 @@ namespace ZZCityGen.Data
         [Range(1000, 50000000)] public int targetPopulation = 2500000;
         [Range(0.05f, 1f)] public float urbanDensity = 0.55f;
         [Range(0.05f, 1f)] public float economicDevelopment = 0.65f;
+        [Range(0f, 1f)] public float landmarkFrequency = 0.45f;
 
         [Header("Terrain")]
         [Range(0f, 1f)] public float mountainAmount = 0.28f;
@@ -60,6 +62,7 @@ namespace ZZCityGen.Data
         public bool generateAirports = true;
         public bool generatePorts = true;
         public bool generateBridgesAndTunnels = true;
+        public bool generateFreightTerminals = true;
 
         [Header("Runtime")]
         public bool enableEconomySimulation = true;

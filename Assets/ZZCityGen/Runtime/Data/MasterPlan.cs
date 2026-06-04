@@ -16,7 +16,9 @@ namespace ZZCityGen.Data
         Tourism,
         PublicPark,
         Port,
-        Airport
+        Airport,
+        FreightTerminal,
+        Utility
     }
 
     public enum TransportType
@@ -30,6 +32,16 @@ namespace ZZCityGen.Data
         Tunnel
     }
 
+    public enum InfrastructureType
+    {
+        Airport,
+        Port,
+        FreightTerminal,
+        PowerPlant,
+        WaterTreatment,
+        TransitHub
+    }
+
     [Serializable]
     public sealed class MasterPlan
     {
@@ -40,6 +52,9 @@ namespace ZZCityGen.Data
         public List<CityPlan> cities = new List<CityPlan>();
         public List<NaturalFeaturePlan> naturalFeatures = new List<NaturalFeaturePlan>();
         public List<TransportLinkPlan> transportLinks = new List<TransportLinkPlan>();
+        public List<InfrastructurePlan> infrastructure = new List<InfrastructurePlan>();
+        public List<LandmarkPlan> landmarks = new List<LandmarkPlan>();
+        public List<MapLayerPlan> mapLayers = new List<MapLayerPlan>();
         public EconomyPlan economy = new EconomyPlan();
     }
 
@@ -72,8 +87,11 @@ namespace ZZCityGen.Data
         public DistrictType type;
         public Rect bounds;
         public int populationTarget;
+        public int jobsTarget;
         public float density;
         public float development;
+        public float electricityMegawatts;
+        public float waterMegalitersPerDay;
     }
 
     [Serializable]
@@ -98,6 +116,36 @@ namespace ZZCityGen.Data
     }
 
     [Serializable]
+    public sealed class InfrastructurePlan
+    {
+        public string name;
+        public InfrastructureType type;
+        public Vector2 position;
+        public float serviceRadiusMeters;
+        public int capacity;
+        public string ownerCityName;
+    }
+
+    [Serializable]
+    public sealed class LandmarkPlan
+    {
+        public string name;
+        public DistrictType districtType;
+        public Vector2 position;
+        public Vector2 footprintMeters;
+        public float heightMeters;
+        public float uniqueness;
+    }
+
+    [Serializable]
+    public sealed class MapLayerPlan
+    {
+        public string name;
+        public string layerType;
+        public int elementCount;
+    }
+
+    [Serializable]
     public sealed class EconomyPlan
     {
         public int totalPopulation;
@@ -105,5 +153,8 @@ namespace ZZCityGen.Data
         public float electricityMegawatts;
         public float waterMegalitersPerDay;
         public float freightTonsPerDay;
+        public int publicServiceJobs;
+        public int industrialJobs;
+        public int tourismJobs;
     }
 }

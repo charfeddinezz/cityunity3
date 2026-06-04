@@ -40,6 +40,16 @@ namespace ZZCityGen.Utilities
             return $"{Pick(Prefixes)} {featureType} {index + 1}";
         }
 
+        public string NextInfrastructureName(string infrastructureType, string cityName)
+        {
+            return $"{cityName} {infrastructureType}";
+        }
+
+        public string NextLandmarkName(int index)
+        {
+            return $"{Pick(Prefixes)} {Pick(new[] { "Tower", "Civic Center", "Grand Park", "Innovation Campus", "Harbor Gate" })} {index + 1}";
+        }
+
         private string Pick(string[] values)
         {
             return values[random.Next(values.Length)];

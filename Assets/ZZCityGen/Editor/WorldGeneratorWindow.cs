@@ -8,15 +8,16 @@ namespace ZZCityGen.Editor
     {
         private WorldGenerator generator;
 
+        [MenuItem("Tools/World Generator Window")]
         [MenuItem("Tools/ZZ CityGen/World Generator")]
         public static void Open()
         {
-            GetWindow<WorldGeneratorWindow>("ZZ CityGen");
+            GetWindow<WorldGeneratorWindow>("World Generator Window");
         }
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("Smart World & City Generator", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("World Generator Window", EditorStyles.boldLabel);
             generator = (WorldGenerator)EditorGUILayout.ObjectField("Generator", generator, typeof(WorldGenerator), true);
 
             if (generator == null && GUILayout.Button("Create Generator In Scene"))
@@ -28,7 +29,7 @@ namespace ZZCityGen.Editor
 
             using (new EditorGUI.DisabledScope(generator == null))
             {
-                DrawStageButton("1. Build Master Plan", () => generator.GenerateMasterPlan());
+                DrawStageButton("Generate Master Plan", () => generator.GenerateMasterPlan());
                 DrawStageButton("2. Generate Terrain", () => generator.GenerateTerrain());
                 DrawStageButton("3. Generate Cities & Districts", () => generator.GenerateCities());
                 DrawStageButton("4. Generate Transport", () => generator.GenerateTransport());

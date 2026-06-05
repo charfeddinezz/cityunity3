@@ -20,13 +20,15 @@ ZZ CityGen is a smart procedural world and city generator for Unity. It is desig
 
 1. Open this repository in Unity.
 2. Add a `ZZCityGen.Generation.WorldGenerator` component to a scene object, or use **Tools > ZZ CityGen > World Generator**.
-3. Tune the `WorldGenerationSettings` values in the Inspector.
-4. Click each generation stage independently or click **Generate Complete World**.
+3. Tune the stage-one `WorldSettings` values in the Inspector: world size, seed, number of cities, terrain settings, road settings, and building settings. Advanced generation options remain available in `WorldGenerationSettings`.
+4. Click **Generate Master Plan** from **Tools > World Generator Window**, then run each generation stage independently or click **Generate Complete World**.
 5. Assign an optional `AssetCatalog` to use your own prefabs with footprint-aware lot placement.
 
 ## Folder Layout
 
-- `Assets/ZZCityGen/Runtime/Data`: serializable settings, plans, and asset catalog definitions.
+The Unity project also includes the stage-one asset folders requested for content authors: `Assets/Scripts`, `Assets/Prefabs`, `Assets/Materials`, `Assets/Data`, `Assets/Editor`, `Assets/Terrain`, `Assets/Roads`, `Assets/Cities`, `Assets/Buildings`, `Assets/Parks`, `Assets/Traffic`, and `Assets/Streaming`.
+
+- `Assets/ZZCityGen/Runtime/Data`: serializable settings, plans, and asset catalog definitions, including `WorldSettings` and `WorldPlan`.
 - `Assets/ZZCityGen/Runtime/Planning`: deterministic Master Plan generation.
 - `Assets/ZZCityGen/Runtime/Generation`: scene generation orchestration.
 - `Assets/ZZCityGen/Runtime/Simulation`: economy and traffic simulation scaffolding.

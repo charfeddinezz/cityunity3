@@ -10,24 +10,47 @@ namespace ZZCityGen.Generation
     [ExecuteAlways]
     public sealed class WorldGenerator : MonoBehaviour
     {
+        [SerializeField] private WorldSettings worldSettings = new WorldSettings();
         [SerializeField] private WorldGenerationSettings settings = new WorldGenerationSettings();
         [SerializeField] private AssetCatalog assetCatalog;
         [SerializeField] private Transform generatedRoot;
 
         private MasterPlan currentPlan;
+        private WorldPlan currentWorldPlan;
         private ChunkStreamingController streamingController;
         private EconomySimulator economySimulator;
         private TrafficSimulator trafficSimulator;
         private PluginRegistry pluginRegistry;
 
+        public WorldSettings StageOneSettings => worldSettings;
         public WorldGenerationSettings Settings => settings;
         public MasterPlan CurrentPlan => currentPlan;
+        public WorldPlan CurrentWorldPlan => currentWorldPlan;
 
         public void GenerateMasterPlan()
         {
+            ApplyStageOneSettings();
+            currentWorldPlan = new WorldPlanBuilder(worldSettings).Build();
             currentPlan = new MasterPlanBuilder(settings).Build();
             EnsureRuntimeSystems();
             pluginRegistry.ApplyMasterPlanExtensions(currentPlan, settings);
+        }
+
+        private void ApplyStageOneSettings()
+        {
+            if (worldSettings == null)
+            {
+                worldSettings = new WorldSettings();
+            }
+
+            settings.worldSeed = worldSettings.seed;
+            settings.cityCount = Mathf.Clamp(worldSettings.numberOfCities, 1, 128);
+            settings.worldSizeInChunks = Mathf.Clamp(Mathf.RoundToInt(worldSettings.worldSize / (float)Mathf.Max(1, settings.chunkSizeMeters)), 8, 512);
+            settings.mountainAmount = worldSettings.terrainSettings != null ? worldSettings.terrainSettings.mountainAmount : settings.mountainAmount;
+            settings.waterAmount = worldSettings.terrainSettings != null ? worldSettings.terrainSettings.riverAmount : settings.waterAmount;
+            settings.forestAmount = worldSettings.terrainSettings != null ? worldSettings.terrainSettings.parkAmount : settings.forestAmount;
+            settings.generateHighways = worldSettings.roadSettings == null || worldSettings.roadSettings.connectAllCities;
+            settings.urbanDensity = worldSettings.buildingSettings != null ? worldSettings.buildingSettings.density : settings.urbanDensity;
         }
 
         public void GenerateTerrain()

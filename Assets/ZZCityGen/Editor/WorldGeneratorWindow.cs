@@ -32,9 +32,11 @@ namespace ZZCityGen.Editor
                 DrawStageButton("2. Generate Terrain", () => generator.GenerateTerrain());
                 DrawStageButton("3. Generate Cities & Districts", () => generator.GenerateCities());
                 DrawStageButton("4. Generate Transport", () => generator.GenerateTransport());
-                DrawStageButton("5. Generate Infrastructure & Landmarks", () => generator.GenerateInfrastructure());
-                DrawStageButton("6. Configure Economy, Traffic & Streaming", () => generator.ConfigureSimulation());
-                DrawStageButton("7. Optimize World", () => generator.OptimizeWorld());
+                DrawStageButton("5. Generate Buildings", () => generator.GenerateBuildings());
+                DrawStageButton("6. Generate Parks", () => generator.GenerateParks());
+                DrawStageButton("7. Generate Infrastructure & Utilities", () => generator.GenerateInfrastructure());
+                DrawStageButton("8. Configure Economy, Traffic & Streaming", () => generator.ConfigureSimulation());
+                DrawStageButton("9. Optimize World", () => generator.OptimizeWorld());
 
                 EditorGUILayout.Space(8f);
                 if (GUILayout.Button("Generate Complete World", GUILayout.Height(34f)))

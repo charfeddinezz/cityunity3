@@ -14,6 +14,14 @@ namespace ZZCityGen.Data
         public List<WorldParkPlan> Parks = new List<WorldParkPlan>();
         public List<WorldDistrictPlan> Districts = new List<WorldDistrictPlan>();
         public List<WorldLotPlan> Lots = new List<WorldLotPlan>();
+        public List<WorldParkTreePlan> ParkTrees = new List<WorldParkTreePlan>();
+        public List<WorldParkPondPlan> ParkPonds = new List<WorldParkPondPlan>();
+        public List<WorldParkPathPlan> ParkPaths = new List<WorldParkPathPlan>();
+        public List<WorldInfrastructurePlan> Infrastructure = new List<WorldInfrastructurePlan>();
+        public List<WorldUtilityLinePlan> UtilityLines = new List<WorldUtilityLinePlan>();
+        public List<WorldTrafficRoutePlan> TrafficRoutes = new List<WorldTrafficRoutePlan>();
+        public List<WorldSiteReservationPlan> SiteReservations = new List<WorldSiteReservationPlan>();
+        public List<WorldPlanningRecommendationPlan> PlanningRecommendations = new List<WorldPlanningRecommendationPlan>();
         public TerrainPlan Terrain = new TerrainPlan();
         public RoadNetworkPlan RoadNetwork = new RoadNetworkPlan();
 
@@ -75,7 +83,54 @@ namespace ZZCityGen.Data
                                 lengthMeters = lot.lengthMeters,
                                 areaSquareMeters = lot.areaSquareMeters,
                                 zoneType = lot.zoneType,
-                                plainText = lot.plainText
+                                plainText = lot.plainText,
+                                matchedPrefabId = lot.matchedPrefabId,
+                                matchedPrefabCategory = lot.matchedPrefabCategory,
+                                matchedFootprintMeters = lot.matchedFootprintMeters,
+                                matchedHeightMeters = lot.matchedHeightMeters,
+                                matchedPrefabPlainText = lot.matchedPrefabPlainText
+                            });
+                        }
+                    }
+
+                    if (district.trees != null)
+                    {
+                        foreach (var tree in district.trees)
+                        {
+                            worldPlan.ParkTrees.Add(new WorldParkTreePlan
+                            {
+                                name = tree.name,
+                                districtName = district.name,
+                                position = tree.position,
+                                heightMeters = tree.heightMeters
+                            });
+                        }
+                    }
+
+                    if (district.ponds != null)
+                    {
+                        foreach (var pond in district.ponds)
+                        {
+                            worldPlan.ParkPonds.Add(new WorldParkPondPlan
+                            {
+                                name = pond.name,
+                                districtName = district.name,
+                                center = pond.center,
+                                radiusMeters = pond.radiusMeters
+                            });
+                        }
+                    }
+
+                    if (district.paths != null)
+                    {
+                        foreach (var path in district.paths)
+                        {
+                            worldPlan.ParkPaths.Add(new WorldParkPathPlan
+                            {
+                                name = path.name,
+                                districtName = district.name,
+                                pathPoints = new List<Vector2>(path.pathPoints),
+                                widthMeters = path.widthMeters
                             });
                         }
                     }
@@ -114,6 +169,82 @@ namespace ZZCityGen.Data
                         position = feature.start,
                         radiusMeters = feature.widthOrRadius,
                         elevation = (feature.startElevation + feature.endElevation) * 0.5f
+                    });
+                }
+            }
+
+            if (plan.infrastructure != null)
+            {
+                foreach (var infrastructure in plan.infrastructure)
+                {
+                    worldPlan.Infrastructure.Add(new WorldInfrastructurePlan
+                    {
+                        name = infrastructure.name,
+                        type = infrastructure.type,
+                        position = infrastructure.position,
+                        serviceRadiusMeters = infrastructure.serviceRadiusMeters,
+                        capacity = infrastructure.capacity,
+                        ownerCityName = infrastructure.ownerCityName
+                    });
+                }
+            }
+
+            if (plan.utilityLines != null)
+            {
+                foreach (var line in plan.utilityLines)
+                {
+                    worldPlan.UtilityLines.Add(new WorldUtilityLinePlan
+                    {
+                        name = line.name,
+                        type = line.type,
+                        from = line.from,
+                        to = line.to,
+                        capacity = line.capacity
+                    });
+                }
+            }
+
+            if (plan.trafficRoutes != null)
+            {
+                foreach (var route in plan.trafficRoutes)
+                {
+                    worldPlan.TrafficRoutes.Add(new WorldTrafficRoutePlan
+                    {
+                        name = route.name,
+                        type = route.type,
+                        pathPoints = new List<Vector2>(route.pathPoints),
+                        frequencyPerHour = route.frequencyPerHour,
+                        vehicleCount = route.vehicleCount
+                    });
+                }
+            }
+
+            if (plan.siteReservations != null)
+            {
+                foreach (var reservation in plan.siteReservations)
+                {
+                    worldPlan.SiteReservations.Add(new WorldSiteReservationPlan
+                    {
+                        ownerName = reservation.ownerName,
+                        purpose = reservation.purpose,
+                        position = reservation.position,
+                        radiusMeters = reservation.radiusMeters,
+                        score = reservation.score
+                    });
+                }
+            }
+
+            if (plan.planningRecommendations != null)
+            {
+                foreach (var recommendation in plan.planningRecommendations)
+                {
+                    worldPlan.PlanningRecommendations.Add(new WorldPlanningRecommendationPlan
+                    {
+                        name = recommendation.name,
+                        purpose = recommendation.purpose,
+                        position = recommendation.position,
+                        score = recommendation.score,
+                        rationale = recommendation.rationale
                     });
                 }
             }
@@ -176,6 +307,57 @@ namespace ZZCityGen.Data
     }
 
     [Serializable]
+    public sealed class WorldInfrastructurePlan
+    {
+        public string name;
+        public InfrastructureType type;
+        public Vector2 position;
+        public float serviceRadiusMeters;
+        public int capacity;
+        public string ownerCityName;
+    }
+
+    [Serializable]
+    public sealed class WorldUtilityLinePlan
+    {
+        public string name;
+        public UtilityLineType type;
+        public Vector2 from;
+        public Vector2 to;
+        public int capacity;
+    }
+
+    [Serializable]
+    public sealed class WorldTrafficRoutePlan
+    {
+        public string name;
+        public TransportType type;
+        public List<Vector2> pathPoints = new List<Vector2>();
+        public int frequencyPerHour;
+        public int vehicleCount;
+    }
+
+    [Serializable]
+    public sealed class WorldSiteReservationPlan
+    {
+        public string ownerName;
+        public SitePurpose purpose;
+        public Vector2 position;
+        public float radiusMeters;
+        public float score;
+    }
+
+    [Serializable]
+    public sealed class WorldPlanningRecommendationPlan
+    {
+        public string name;
+        public SitePurpose purpose;
+        public Vector2 position;
+        public float score;
+        public string rationale;
+    }
+
+    [Serializable]
     public sealed class WorldParkPlan
     {
         public string name;
@@ -204,5 +386,38 @@ namespace ZZCityGen.Data
         public float areaSquareMeters;
         public DistrictType zoneType;
         public string plainText;
+
+        public string matchedPrefabId;
+        public PrefabCategory matchedPrefabCategory;
+        public Vector2 matchedFootprintMeters;
+        public float matchedHeightMeters;
+        public string matchedPrefabPlainText;
+    }
+
+    [Serializable]
+    public sealed class WorldParkTreePlan
+    {
+        public string name;
+        public string districtName;
+        public Vector2 position;
+        public float heightMeters;
+    }
+
+    [Serializable]
+    public sealed class WorldParkPondPlan
+    {
+        public string name;
+        public string districtName;
+        public Vector2 center;
+        public float radiusMeters;
+    }
+
+    [Serializable]
+    public sealed class WorldParkPathPlan
+    {
+        public string name;
+        public string districtName;
+        public List<Vector2> pathPoints = new List<Vector2>();
+        public float widthMeters;
     }
 }

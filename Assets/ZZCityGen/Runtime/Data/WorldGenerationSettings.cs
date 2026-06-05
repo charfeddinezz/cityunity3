@@ -64,12 +64,21 @@ namespace ZZCityGen.Data
         public bool generateHighways = true;
         public bool generateRail = true;
         public bool generateMetro = true;
+        public bool generateTrafficSystem = true;
+        public bool generateBusRoutes = true;
+        public bool generateCarRoutes = true;
         public bool generateStreets = true;
         public bool generateRoundabouts = true;
+        public bool generateParks = true;
         public bool generateAirports = true;
         public bool generatePorts = true;
         public bool generateBridgesAndTunnels = true;
         public bool generateFreightTerminals = true;
+        public bool generateElectricity = true;
+        public bool generateWater = true;
+        public bool generateSewage = true;
+        public bool generateStreetLights = true;
+        public bool generateTrafficSignals = true;
 
         [Header("Runtime")]
         public bool enableEconomySimulation = true;

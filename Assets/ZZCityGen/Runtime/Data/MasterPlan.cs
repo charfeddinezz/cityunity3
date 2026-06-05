@@ -47,6 +47,10 @@ namespace ZZCityGen.Data
         FreightTerminal,
         PowerPlant,
         WaterTreatment,
+        SewageTreatment,
+        Substation,
+        StreetLight,
+        TrafficSignal,
         TransitHub
     }
 
@@ -58,7 +62,12 @@ namespace ZZCityGen.Data
         Airport,
         Port,
         Industrial,
-        Park
+        Park,
+        Electricity,
+        Water,
+        Sewage,
+        StreetLighting,
+        TrafficControl
     }
 
     [Serializable]
@@ -75,7 +84,9 @@ namespace ZZCityGen.Data
         public List<SiteReservationPlan> siteReservations = new List<SiteReservationPlan>();
         public List<UrbanPlanningRecommendationPlan> planningRecommendations = new List<UrbanPlanningRecommendationPlan>();
         public List<TransportLinkPlan> transportLinks = new List<TransportLinkPlan>();
+        public List<TrafficRoutePlan> trafficRoutes = new List<TrafficRoutePlan>();
         public List<InfrastructurePlan> infrastructure = new List<InfrastructurePlan>();
+        public List<UtilityLinePlan> utilityLines = new List<UtilityLinePlan>();
         public List<LandmarkPlan> landmarks = new List<LandmarkPlan>();
         public List<MapLayerPlan> mapLayers = new List<MapLayerPlan>();
         public List<GrowthPhasePlan> growthPhases = new List<GrowthPhasePlan>();
@@ -139,6 +150,9 @@ namespace ZZCityGen.Data
         public float electricityMegawatts;
         public float waterMegalitersPerDay;
         public List<LotPlan> lots = new List<LotPlan>();
+        public List<ParkTreePlan> trees = new List<ParkTreePlan>();
+        public List<ParkPondPlan> ponds = new List<ParkPondPlan>();
+        public List<ParkPathPlan> paths = new List<ParkPathPlan>();
     }
 
     [Serializable]
@@ -152,6 +166,36 @@ namespace ZZCityGen.Data
         public float areaSquareMeters;
         public DistrictType zoneType;
         public string plainText;
+
+        public string matchedPrefabId;
+        public PrefabCategory matchedPrefabCategory;
+        public Vector2 matchedFootprintMeters;
+        public float matchedHeightMeters;
+        public string matchedPrefabPlainText;
+    }
+
+    [Serializable]
+    public sealed class ParkTreePlan
+    {
+        public string name;
+        public Vector2 position;
+        public float heightMeters;
+    }
+
+    [Serializable]
+    public sealed class ParkPondPlan
+    {
+        public string name;
+        public Vector2 center;
+        public float radiusMeters;
+    }
+
+    [Serializable]
+    public sealed class ParkPathPlan
+    {
+        public string name;
+        public List<Vector2> pathPoints = new List<Vector2>();
+        public float widthMeters;
     }
 
     [Serializable]
@@ -221,6 +265,33 @@ namespace ZZCityGen.Data
         public float serviceRadiusMeters;
         public int capacity;
         public string ownerCityName;
+    }
+
+    [Serializable]
+    public sealed class TrafficRoutePlan
+    {
+        public string name;
+        public TransportType type;
+        public List<Vector2> pathPoints = new List<Vector2>();
+        public int frequencyPerHour;
+        public int vehicleCount;
+    }
+
+    public enum UtilityLineType
+    {
+        Power,
+        Water,
+        Sewage
+    }
+
+    [Serializable]
+    public sealed class UtilityLinePlan
+    {
+        public string name;
+        public UtilityLineType type;
+        public Vector2 from;
+        public Vector2 to;
+        public int capacity;
     }
 
     [Serializable]

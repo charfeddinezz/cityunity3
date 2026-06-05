@@ -34,6 +34,7 @@ namespace ZZCityGen.Planning
             BuildTerrainAnalysis(plan);
             BuildCities(plan);
             BuildVillages(plan);
+            BuildParks(plan);
             BuildTransport(plan);
             BuildEconomy(plan);
             BuildInfrastructure(plan);
@@ -75,6 +76,16 @@ namespace ZZCityGen.Planning
                 var score = city.archetype == CityArchetype.CapitalMegacity ? 1f : ScorePosition(plan, SitePurpose.City, city.position);
                 ReserveSite(plan, city.archetype == CityArchetype.CapitalMegacity ? SitePurpose.Capital : SitePurpose.City, city.name, city.position, city.radiusMeters, score);
             }
+        }
+
+        private void BuildParks(MasterPlan plan)
+        {
+            if (!settings.generateParks)
+            {
+                return;
+            }
+
+            new ParkGenerator(settings, settings.worldSeed).BuildParks(plan);
         }
 
         private void BuildVillages(MasterPlan plan)
@@ -310,6 +321,8 @@ namespace ZZCityGen.Planning
                 }
             }
 
+            BuildTrafficRoutes(plan);
+
             for (var i = 1; i < plan.cities.Count; i++)
             {
                 var from = plan.cities[i];
@@ -337,6 +350,108 @@ namespace ZZCityGen.Planning
             }
         }
 
+        private void BuildTrafficRoutes(MasterPlan plan)
+        {
+            if (!settings.generateTrafficSystem)
+            {
+                return;
+            }
+
+            plan.trafficRoutes.Clear();
+
+            if (settings.generateCarRoutes)
+            {
+                BuildCarRoutes(plan);
+            }
+
+            if (settings.generateBusRoutes)
+            {
+                BuildBusRoutes(plan);
+            }
+
+            if (settings.generateRail)
+            {
+                BuildTrainRoutes(plan);
+            }
+
+            if (settings.generateMetro)
+            {
+                BuildMetroRoutes(plan);
+            }
+        }
+
+        private void BuildCarRoutes(MasterPlan plan)
+        {
+            if (plan.roadNetwork?.MainStreets == null)
+            {
+                return;
+            }
+
+            foreach (var segment in plan.roadNetwork.MainStreets)
+            {
+                if (segment == null || segment.lengthMeters < 80f)
+                {
+                    continue;
+                }
+
+                AddTrafficRoute(plan, TransportType.Car, segment.from, segment.to, Mathf.Max(1, Mathf.RoundToInt(segment.lengthMeters / 180f)), Mathf.Max(4, Mathf.RoundToInt(segment.lengthMeters / 120f)));
+            }
+        }
+
+        private void BuildBusRoutes(MasterPlan plan)
+        {
+            foreach (var city in plan.cities)
+            {
+                foreach (var district in city.districts)
+                {
+                    if (district.type != DistrictType.Business && district.type != DistrictType.Government && district.type != DistrictType.Education && district.type != DistrictType.Tourism && district.type != DistrictType.Residential && district.type != DistrictType.LuxuryResidential)
+                    {
+                        continue;
+                    }
+
+                    AddTrafficRoute(plan, TransportType.Bus, city.position, district.bounds.center, 12, Mathf.Max(2, Mathf.RoundToInt(district.bounds.size.magnitude / 200f)));
+                }
+            }
+        }
+
+        private void BuildTrainRoutes(MasterPlan plan)
+        {
+            foreach (var link in plan.transportLinks)
+            {
+                if (link.type != TransportType.Rail)
+                {
+                    continue;
+                }
+
+                AddTrafficRoute(plan, TransportType.Rail, link.from, link.to, 8, 6);
+            }
+        }
+
+        private void BuildMetroRoutes(MasterPlan plan)
+        {
+            foreach (var link in plan.transportLinks)
+            {
+                if (link.type != TransportType.Metro)
+                {
+                    continue;
+                }
+
+                AddTrafficRoute(plan, TransportType.Metro, link.from, link.to, 10, 8);
+            }
+        }
+
+        private void AddTrafficRoute(MasterPlan plan, TransportType type, Vector2 from, Vector2 to, int frequencyPerHour, int vehicleCount)
+        {
+            plan.trafficRoutes.Add(new TrafficRoutePlan
+            {
+                name = names.NextInfrastructureName(type.ToString(), string.Empty),
+                type = type,
+                pathPoints = new List<Vector2> { from, to },
+                frequencyPerHour = Mathf.Max(1, frequencyPerHour),
+                vehicleCount = Mathf.Max(1, vehicleCount)
+            });
+        }
+
         private void BuildInfrastructure(MasterPlan plan)
         {
             foreach (var city in plan.cities)
@@ -360,12 +475,215 @@ namespace ZZCityGen.Planning
                     }
                 }
 
-                if (city.archetype == CityArchetype.CapitalMegacity || city.archetype == CityArchetype.IndustrialCity)
+                if (settings.generateElectricity)
                 {
                     var offset = new Vector2(city.radiusMeters * 0.85f, -city.radiusMeters * 0.65f);
                     AddInfrastructure(plan, InfrastructureType.PowerPlant, city, ClampToWorld(city.position + offset, plan.worldSizeMeters), Mathf.RoundToInt(city.populationTarget * 0.75f));
-                    AddInfrastructure(plan, InfrastructureType.WaterTreatment, city, ClampToWorld(city.position - offset, plan.worldSizeMeters), Mathf.RoundToInt(city.populationTarget * 0.65f));
+
+                    var substations = Mathf.Clamp(Mathf.RoundToInt(city.radiusMeters / 220f), 1, 3);
+                    for (var i = 0; i < substations; i++)
+                    {
+                        var angle = Mathf.PI * 2f * i / substations;
+                        var position = ClampToWorld(city.position + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * city.radiusMeters * 0.58f, plan.worldSizeMeters);
+                        AddInfrastructure(plan, InfrastructureType.Substation, city, position, Mathf.RoundToInt(city.populationTarget * 0.35f));
+                    }
                 }
+
+                if (settings.generateWater)
+                {
+                    var offset = new Vector2(-city.radiusMeters * 0.72f, city.radiusMeters * 0.68f);
+                    AddInfrastructure(plan, InfrastructureType.WaterTreatment, city, ClampToWorld(city.position + offset, plan.worldSizeMeters), Mathf.RoundToInt(city.populationTarget * 0.65f));
+                }
+
+                if (settings.generateSewage)
+                {
+                    var offset = new Vector2(city.radiusMeters * 0.52f, city.radiusMeters * 0.72f);
+                    AddInfrastructure(plan, InfrastructureType.SewageTreatment, city, ClampToWorld(city.position + offset, plan.worldSizeMeters), Mathf.RoundToInt(city.populationTarget * 0.55f));
+                }
+
+            }
+
+            if (settings.generateStreetLights)
+            {
+                BuildStreetLights(plan);
+            }
+
+            if (settings.generateTrafficSignals)
+            {
+                BuildTrafficSignals(plan);
+            }
+
+            if (settings.generateElectricity || settings.generateWater || settings.generateSewage)
+            {
+                BuildUtilityNetwork(plan);
+            }
+        }
+
+        private void BuildUtilityNetwork(MasterPlan plan)
+        {
+            if (plan.utilityLines == null)
+            {
+                plan.utilityLines = new List<UtilityLinePlan>();
+            }
+
+            var powerPlants = plan.infrastructure.FindAll(i => i.type == InfrastructureType.PowerPlant);
+            var substations = plan.infrastructure.FindAll(i => i.type == InfrastructureType.Substation);
+            var waterPlants = plan.infrastructure.FindAll(i => i.type == InfrastructureType.WaterTreatment);
+            var sewagePlants = plan.infrastructure.FindAll(i => i.type == InfrastructureType.SewageTreatment);
+
+            foreach (var substation in substations)
+            {
+                var nearestPower = FindNearestInfrastructure(powerPlants, substation.position);
+                if (nearestPower != null)
+                {
+                    plan.utilityLines.Add(new UtilityLinePlan
+                    {
+                        name = $"Power Line {nearestPower.name} -> {substation.name}",
+                        type = UtilityLineType.Power,
+                        from = nearestPower.position,
+                        to = substation.position,
+                        capacity = Mathf.Max(100, substation.capacity)
+                    });
+                }
+            }
+
+            foreach (var water in waterPlants)
+            {
+                var city = plan.cities.Find(c => c.name == water.ownerCityName) ?? FindNearestCity(plan.cities, water.position);
+                if (city != null)
+                {
+                    plan.utilityLines.Add(new UtilityLinePlan
+                    {
+                        name = $"Water Line {water.name} -> {city.name}",
+                        type = UtilityLineType.Water,
+                        from = water.position,
+                        to = city.position,
+                        capacity = Mathf.Max(100, water.capacity)
+                    });
+                }
+            }
+
+            foreach (var sewage in sewagePlants)
+            {
+                var city = plan.cities.Find(c => c.name == sewage.ownerCityName) ?? FindNearestCity(plan.cities, sewage.position);
+                if (city != null)
+                {
+                    plan.utilityLines.Add(new UtilityLinePlan
+                    {
+                        name = $"Sewage Line {sewage.name} -> {city.name}",
+                        type = UtilityLineType.Sewage,
+                        from = sewage.position,
+                        to = city.position,
+                        capacity = Mathf.Max(100, sewage.capacity)
+                    });
+                }
+            }
+
+            foreach (var substation in substations)
+            {
+                var city = FindNearestCity(plan.cities, substation.position);
+                if (city != null)
+                {
+                    plan.utilityLines.Add(new UtilityLinePlan
+                    {
+                        name = $"Distribution Feed {substation.name} -> {city.name}",
+                        type = UtilityLineType.Power,
+                        from = substation.position,
+                        to = city.position,
+                        capacity = Mathf.Max(100, substation.capacity)
+                    });
+                }
+            }
+        }
+
+        private InfrastructurePlan FindNearestInfrastructure(List<InfrastructurePlan> infrastructure, Vector2 position)
+        {
+            InfrastructurePlan nearest = null;
+            var bestDistance = float.MaxValue;
+            foreach (var item in infrastructure)
+            {
+                var distance = Vector2.SqrMagnitude(item.position - position);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    nearest = item;
+                }
+            }
+
+            return nearest;
+        }
+
+        private void BuildStreetLights(MasterPlan plan)
+        {
+            if (plan.roadNetwork == null)
+            {
+                return;
+            }
+
+            var segments = new List<StreetSegmentPlan>();
+            if (plan.roadNetwork.MainStreets != null)
+            {
+                segments.AddRange(plan.roadNetwork.MainStreets);
+            }
+
+            if (plan.roadNetwork.SecondaryStreets != null)
+            {
+                segments.AddRange(plan.roadNetwork.SecondaryStreets);
+            }
+
+            foreach (var segment in segments)
+            {
+                if (segment == null || segment.lengthMeters < 20f)
+                {
+                    continue;
+                }
+
+                var direction = (segment.to - segment.from).normalized;
+                var spacing = segment.roadClass != null && segment.roadClass.IndexOf("main", StringComparison.OrdinalIgnoreCase) >= 0 ? 28f : 44f;
+                spacing = segment.roadClass != null && segment.roadClass.IndexOf("highway", StringComparison.OrdinalIgnoreCase) >= 0 ? 18f : spacing;
+                var count = Mathf.Max(1, Mathf.FloorToInt(segment.lengthMeters / spacing));
+                for (var index = 0; index < count; index++)
+                {
+                    var offset = (segment.lengthMeters / (count + 1)) * (index + 1);
+                    var position = segment.from + direction * offset;
+                    var city = FindNearestCity(plan.cities, position);
+                    if (city == null)
+                    {
+                        continue;
+                    }
+
+                    AddInfrastructure(plan, InfrastructureType.StreetLight, city, position, 1);
+                }
+            }
+        }
+
+        private void BuildTrafficSignals(MasterPlan plan)
+        {
+            if (plan.roadNetwork == null || plan.roadNetwork.Intersections == null)
+            {
+                return;
+            }
+
+            foreach (var intersection in plan.roadNetwork.Intersections)
+            {
+                if (intersection == null || intersection.connectedSegments == null || intersection.connectedSegments.Count < 2)
+                {
+                    continue;
+                }
+
+                var isSignalIntersection = intersection.connectedSegments.Count >= 3 || intersection.connectedSegments.Exists(name => name.IndexOf("Main", StringComparison.OrdinalIgnoreCase) >= 0);
+                if (!isSignalIntersection)
+                {
+                    continue;
+                }
+
+                var city = FindNearestCity(plan.cities, intersection.position);
+                if (city == null)
+                {
+                    continue;
+                }
+
+                AddInfrastructure(plan, InfrastructureType.TrafficSignal, city, intersection.position, 1);
             }
         }
 
@@ -516,6 +834,17 @@ namespace ZZCityGen.Planning
                     return SitePurpose.Port;
                 case InfrastructureType.FreightTerminal:
                     return SitePurpose.Industrial;
+                case InfrastructureType.PowerPlant:
+                case InfrastructureType.Substation:
+                    return SitePurpose.Electricity;
+                case InfrastructureType.WaterTreatment:
+                    return SitePurpose.Water;
+                case InfrastructureType.SewageTreatment:
+                    return SitePurpose.Sewage;
+                case InfrastructureType.StreetLight:
+                    return SitePurpose.StreetLighting;
+                case InfrastructureType.TrafficSignal:
+                    return SitePurpose.TrafficControl;
                 default:
                     return SitePurpose.City;
             }

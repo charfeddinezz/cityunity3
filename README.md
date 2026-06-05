@@ -10,8 +10,9 @@ ZZ CityGen is a smart procedural world and city generator for Unity. It is desig
 - Specialized districts for business, residential, industrial, education, government, tourism, parks, airports, ports, freight terminals, and utilities.
 - Airports, ports, freight terminals, power plants, water treatment facilities, and unique landmarks as first-class plan data.
 - Terrain feature plans for rivers, lakes, forests, deserts, and mountain ranges.
+- AI-assisted terrain suitability analysis and reserved non-overlapping sites for city, airport, port, industrial, and village placement before scene generation.
 - Highway, secondary road, rail, metro, and tram networks with bridge and tunnel requirement flags.
-- Economy, population, job sectors, electricity, water, freight, traffic, congestion, growth, and chunk streaming scaffolding.
+- Economy, population, job sectors, electricity, water, freight, traffic, congestion, dynamic growth phases, and chunk streaming scaffolding.
 - Automatic names for worlds, regions, cities, districts, natural features, infrastructure, and landmarks.
 - Automatic map layer plans for world, settlement, transport, and infrastructure views.
 

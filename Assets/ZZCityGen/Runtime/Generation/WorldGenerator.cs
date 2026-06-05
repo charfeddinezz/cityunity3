@@ -40,11 +40,25 @@ namespace ZZCityGen.Generation
             foreach (var feature in currentPlan.naturalFeatures)
             {
                 var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                marker.name = feature.name;
+                marker.name = $"{feature.name} ({feature.startElevation:0.00}->{feature.endElevation:0.00})";
                 marker.transform.SetParent(terrainRoot, false);
                 marker.transform.position = ToWorld(feature.start, 0f);
                 var radius = Mathf.Max(2f, feature.widthOrRadius * 0.5f);
-                marker.transform.localScale = new Vector3(radius, 2f, radius);
+                marker.transform.localScale = new Vector3(radius, 2f + feature.startElevation * 24f, radius);
+            }
+
+            if (currentPlan.terrainAnalysis.Count <= 512)
+            {
+                var analysisRoot = new GameObject("Terrain Suitability Cells");
+                analysisRoot.transform.SetParent(terrainRoot, false);
+                foreach (var cell in currentPlan.terrainAnalysis)
+                {
+                    var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    marker.name = $"Suitability City {cell.citySuitabilityScore:0.00} Port {cell.portSuitabilityScore:0.00} Airport {cell.airportSuitabilityScore:0.00}";
+                    marker.transform.SetParent(analysisRoot.transform, false);
+                    marker.transform.position = ToWorld(cell.center, -0.15f);
+                    marker.transform.localScale = new Vector3(cell.bounds.width * 0.72f, 0.3f + cell.buildabilityScore, cell.bounds.height * 0.72f);
+                }
             }
         }
 
@@ -104,6 +118,35 @@ namespace ZZCityGen.Generation
                 var height = GetInfrastructureHeight(infrastructure.type);
                 marker.transform.position = ToWorld(infrastructure.position, height * 0.5f);
                 marker.transform.localScale = new Vector3(footprint, height, footprint);
+            }
+
+            if (currentPlan.siteReservations.Count > 0)
+            {
+                var reservationRoot = new GameObject("Reserved Planning Sites");
+                reservationRoot.transform.SetParent(infrastructureRoot, false);
+                foreach (var reservation in currentPlan.siteReservations)
+                {
+                    var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    marker.name = $"{reservation.purpose} Reserved: {reservation.ownerName} Score {reservation.score:0.00}";
+                    marker.transform.SetParent(reservationRoot.transform, false);
+                    marker.transform.position = ToWorld(reservation.position, 0.1f);
+                    var radius = Mathf.Clamp(reservation.radiusMeters * 0.08f, 8f, 140f);
+                    marker.transform.localScale = new Vector3(radius, 0.2f, radius);
+                }
+            }
+
+            if (currentPlan.planningRecommendations.Count > 0)
+            {
+                var recommendationRoot = new GameObject("AI Planning Recommendations");
+                recommendationRoot.transform.SetParent(infrastructureRoot, false);
+                foreach (var recommendation in currentPlan.planningRecommendations)
+                {
+                    var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    marker.name = $"{recommendation.name} Score {recommendation.score:0.00}";
+                    marker.transform.SetParent(recommendationRoot.transform, false);
+                    marker.transform.position = ToWorld(recommendation.position, 24f);
+                    marker.transform.localScale = Vector3.one * Mathf.Lerp(18f, 72f, recommendation.score);
+                }
             }
 
             foreach (var landmark in currentPlan.landmarks)

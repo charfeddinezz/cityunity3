@@ -42,6 +42,17 @@ namespace ZZCityGen.Data
         TransitHub
     }
 
+    public enum SitePurpose
+    {
+        Capital,
+        City,
+        Village,
+        Airport,
+        Port,
+        Industrial,
+        Park
+    }
+
     [Serializable]
     public sealed class MasterPlan
     {
@@ -51,10 +62,14 @@ namespace ZZCityGen.Data
         public List<RegionPlan> regions = new List<RegionPlan>();
         public List<CityPlan> cities = new List<CityPlan>();
         public List<NaturalFeaturePlan> naturalFeatures = new List<NaturalFeaturePlan>();
+        public List<TerrainAnalysisCellPlan> terrainAnalysis = new List<TerrainAnalysisCellPlan>();
+        public List<SiteReservationPlan> siteReservations = new List<SiteReservationPlan>();
+        public List<UrbanPlanningRecommendationPlan> planningRecommendations = new List<UrbanPlanningRecommendationPlan>();
         public List<TransportLinkPlan> transportLinks = new List<TransportLinkPlan>();
         public List<InfrastructurePlan> infrastructure = new List<InfrastructurePlan>();
         public List<LandmarkPlan> landmarks = new List<LandmarkPlan>();
         public List<MapLayerPlan> mapLayers = new List<MapLayerPlan>();
+        public List<GrowthPhasePlan> growthPhases = new List<GrowthPhasePlan>();
         public EconomyPlan economy = new EconomyPlan();
     }
 
@@ -102,6 +117,43 @@ namespace ZZCityGen.Data
         public Vector2 start;
         public Vector2 end;
         public float widthOrRadius;
+        public float startElevation;
+        public float endElevation;
+    }
+
+    [Serializable]
+    public sealed class TerrainAnalysisCellPlan
+    {
+        public Rect bounds;
+        public Vector2 center;
+        public float elevation;
+        public float slope;
+        public float waterAccess;
+        public float resourceRichness;
+        public float buildabilityScore;
+        public float citySuitabilityScore;
+        public float portSuitabilityScore;
+        public float airportSuitabilityScore;
+    }
+
+    [Serializable]
+    public sealed class SiteReservationPlan
+    {
+        public string ownerName;
+        public SitePurpose purpose;
+        public Vector2 position;
+        public float radiusMeters;
+        public float score;
+    }
+
+    [Serializable]
+    public sealed class UrbanPlanningRecommendationPlan
+    {
+        public string name;
+        public SitePurpose purpose;
+        public Vector2 position;
+        public float score;
+        public string rationale;
     }
 
     [Serializable]
@@ -143,6 +195,17 @@ namespace ZZCityGen.Data
         public string name;
         public string layerType;
         public int elementCount;
+    }
+
+    [Serializable]
+    public sealed class GrowthPhasePlan
+    {
+        public string cityName;
+        public int year;
+        public int populationTarget;
+        public float radiusMeters;
+        public float infrastructureBudgetIndex;
+        public List<DistrictType> priorityDistricts = new List<DistrictType>();
     }
 
     [Serializable]

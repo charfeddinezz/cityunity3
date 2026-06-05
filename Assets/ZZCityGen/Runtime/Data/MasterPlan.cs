@@ -33,6 +33,8 @@ namespace ZZCityGen.Data
         SecondaryRoad,
         MainStreet,
         SecondaryStreet,
+        Car,
+        Bus,
         Rail,
         Metro,
         Tram,
@@ -85,6 +87,8 @@ namespace ZZCityGen.Data
         public List<UrbanPlanningRecommendationPlan> planningRecommendations = new List<UrbanPlanningRecommendationPlan>();
         public List<TransportLinkPlan> transportLinks = new List<TransportLinkPlan>();
         public List<TrafficRoutePlan> trafficRoutes = new List<TrafficRoutePlan>();
+        public List<PopulationClusterPlan> populationClusters = new List<PopulationClusterPlan>();
+        public List<PedestrianRoutePlan> pedestrianRoutes = new List<PedestrianRoutePlan>();
         public List<InfrastructurePlan> infrastructure = new List<InfrastructurePlan>();
         public List<UtilityLinePlan> utilityLines = new List<UtilityLinePlan>();
         public List<LandmarkPlan> landmarks = new List<LandmarkPlan>();
@@ -275,6 +279,38 @@ namespace ZZCityGen.Data
         public List<Vector2> pathPoints = new List<Vector2>();
         public int frequencyPerHour;
         public int vehicleCount;
+    }
+
+    public enum PopulationClusterRole
+    {
+        Residence,
+        Employment,
+        Service,
+        Transit
+    }
+
+    [Serializable]
+    public sealed class PopulationClusterPlan
+    {
+        public string name;
+        public string cityName;
+        public string districtName;
+        public PopulationClusterRole role;
+        public Vector2 center;
+        public int residentPopulation;
+        public int jobCapacity;
+        public float footTrafficIndex;
+    }
+
+    [Serializable]
+    public sealed class PedestrianRoutePlan
+    {
+        public string name;
+        public string cityName;
+        public string originClusterName;
+        public string destinationClusterName;
+        public List<Vector2> pathPoints = new List<Vector2>();
+        public float footTrafficIndex;
     }
 
     public enum UtilityLineType

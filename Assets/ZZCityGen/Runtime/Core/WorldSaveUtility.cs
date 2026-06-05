@@ -33,6 +33,11 @@ namespace ZZCityGen.Core
             return JsonUtility.FromJson<MasterPlan>(File.ReadAllText(filePath));
         }
 
+        public static WorldPlan LoadWorldPlan(string filePath)
+        {
+            return JsonUtility.FromJson<WorldPlan>(File.ReadAllText(filePath));
+        }
+
         public static void SaveCityData(CityDataPackage plan, string filePath)
         {
             var json = JsonUtility.ToJson(plan, true);

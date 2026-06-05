@@ -15,8 +15,19 @@ namespace ZZCityGen.Streaming
 
         public void Configure(WorldGenerationSettings settings, MasterPlan plan)
         {
+            Configure(settings, Camera.main?.transform);
+        }
+
+        public void Configure(WorldGenerationSettings settings, Transform viewerTransform)
+        {
+            if (settings == null)
+            {
+                return;
+            }
+
             activeChunkRadius = settings.activeChunkRadius;
             chunkSizeMeters = settings.chunkSizeMeters;
+            viewer = viewerTransform ?? Camera.main?.transform;
             RefreshActiveChunks(viewer != null ? viewer.position : Vector3.zero);
         }
 

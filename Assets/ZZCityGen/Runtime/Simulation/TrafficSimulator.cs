@@ -11,6 +11,7 @@ namespace ZZCityGen.Simulation
         [SerializeField] private int activeFreightVehicles;
         [SerializeField] private float congestionIndex;
         private readonly List<TransportLinkPlan> links = new List<TransportLinkPlan>();
+        private readonly List<TrafficRoutePlan> trafficRoutes = new List<TrafficRoutePlan>();
         private WorldGenerationSettings settings;
 
         public void Configure(MasterPlan plan, WorldGenerationSettings generationSettings)
@@ -18,8 +19,19 @@ namespace ZZCityGen.Simulation
             settings = generationSettings;
             links.Clear();
             links.AddRange(plan.transportLinks);
-            activeVehicles = Mathf.RoundToInt(plan.economy.totalPopulation * 0.12f);
-            activeTransitVehicles = Mathf.RoundToInt(plan.transportLinks.Count * 3.5f);
+            trafficRoutes.Clear();
+            if (plan.trafficRoutes != null)
+            {
+                trafficRoutes.AddRange(plan.trafficRoutes);
+            }
+
+            var carRoutes = trafficRoutes.FindAll(route => route.type == TransportType.Car).Count;
+            var busRoutes = trafficRoutes.FindAll(route => route.type == TransportType.Bus).Count;
+            var trainRoutes = trafficRoutes.FindAll(route => route.type == TransportType.Rail).Count;
+            var metroRoutes = trafficRoutes.FindAll(route => route.type == TransportType.Metro).Count;
+
+            activeVehicles = Mathf.RoundToInt(plan.economy.totalPopulation * (0.12f + carRoutes * 0.0025f));
+            activeTransitVehicles = Mathf.RoundToInt(busRoutes * 6f + trainRoutes * 8f + metroRoutes * 10f + plan.transportLinks.Count * 0.7f);
             activeFreightVehicles = Mathf.RoundToInt(plan.economy.freightTonsPerDay / 18f);
             congestionIndex = CalculateCongestion();
         }
@@ -57,6 +69,10 @@ namespace ZZCityGen.Simulation
                 case TransportType.Metro:
                     return 22000;
                 case TransportType.Tram:
+                    return 9000;
+                case TransportType.Bus:
+                    return 12000;
+                case TransportType.Car:
                     return 9000;
                 default:
                     return 6500;

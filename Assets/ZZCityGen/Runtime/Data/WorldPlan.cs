@@ -20,6 +20,8 @@ namespace ZZCityGen.Data
         public List<WorldInfrastructurePlan> Infrastructure = new List<WorldInfrastructurePlan>();
         public List<WorldUtilityLinePlan> UtilityLines = new List<WorldUtilityLinePlan>();
         public List<WorldTrafficRoutePlan> TrafficRoutes = new List<WorldTrafficRoutePlan>();
+        public List<WorldPopulationClusterPlan> PopulationClusters = new List<WorldPopulationClusterPlan>();
+        public List<WorldPedestrianRoutePlan> PedestrianRoutes = new List<WorldPedestrianRoutePlan>();
         public List<WorldSiteReservationPlan> SiteReservations = new List<WorldSiteReservationPlan>();
         public List<WorldPlanningRecommendationPlan> PlanningRecommendations = new List<WorldPlanningRecommendationPlan>();
         public TerrainPlan Terrain = new TerrainPlan();
@@ -219,6 +221,40 @@ namespace ZZCityGen.Data
                 }
             }
 
+            if (plan.populationClusters != null)
+            {
+                foreach (var cluster in plan.populationClusters)
+                {
+                    worldPlan.PopulationClusters.Add(new WorldPopulationClusterPlan
+                    {
+                        name = cluster.name,
+                        cityName = cluster.cityName,
+                        districtName = cluster.districtName,
+                        role = cluster.role,
+                        center = cluster.center,
+                        residentPopulation = cluster.residentPopulation,
+                        jobCapacity = cluster.jobCapacity,
+                        footTrafficIndex = cluster.footTrafficIndex
+                    });
+                }
+            }
+
+            if (plan.pedestrianRoutes != null)
+            {
+                foreach (var route in plan.pedestrianRoutes)
+                {
+                    worldPlan.PedestrianRoutes.Add(new WorldPedestrianRoutePlan
+                    {
+                        name = route.name,
+                        cityName = route.cityName,
+                        originClusterName = route.originClusterName,
+                        destinationClusterName = route.destinationClusterName,
+                        pathPoints = new List<Vector2>(route.pathPoints),
+                        footTrafficIndex = route.footTrafficIndex
+                    });
+                }
+            }
+
             if (plan.siteReservations != null)
             {
                 foreach (var reservation in plan.siteReservations)
@@ -335,6 +371,30 @@ namespace ZZCityGen.Data
         public List<Vector2> pathPoints = new List<Vector2>();
         public int frequencyPerHour;
         public int vehicleCount;
+    }
+
+    [Serializable]
+    public sealed class WorldPopulationClusterPlan
+    {
+        public string name;
+        public string cityName;
+        public string districtName;
+        public PopulationClusterRole role;
+        public Vector2 center;
+        public int residentPopulation;
+        public int jobCapacity;
+        public float footTrafficIndex;
+    }
+
+    [Serializable]
+    public sealed class WorldPedestrianRoutePlan
+    {
+        public string name;
+        public string cityName;
+        public string originClusterName;
+        public string destinationClusterName;
+        public List<Vector2> pathPoints = new List<Vector2>();
+        public float footTrafficIndex;
     }
 
     [Serializable]

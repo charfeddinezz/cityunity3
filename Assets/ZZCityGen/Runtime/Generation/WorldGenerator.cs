@@ -1,4 +1,5 @@
 using System.IO;
+using System.Collections.Generic;
 using UnityEngine;
 using ZZCityGen.Core;
 using ZZCityGen.Data;
@@ -19,7 +20,14 @@ namespace ZZCityGen.Generation
 
         private MasterPlan currentPlan;
         private ChunkStreamingController streamingController;
+        private ChunkSystem chunkSystem;
+        private StreamingSystem streamingSystem;
+        private LODGenerator lodGenerator;
+        private OcclusionCullingSystem occlusionCullingSystem;
+        private SaveSystem saveSystem;
+        private LoadSystem loadSystem;
         private EconomySimulator economySimulator;
+        private PopulationSimulator populationSimulator;
         private TrafficSimulator trafficSimulator;
         private TrafficSystem trafficSystem;
         private PluginRegistry pluginRegistry;
@@ -56,6 +64,21 @@ namespace ZZCityGen.Generation
         private static string GetCityDataPath()
         {
             return Path.Combine(Application.dataPath, "..", "city_data.json");
+        }
+
+        private static string GetMasterPlanPath()
+        {
+            return Path.Combine(Application.dataPath, "..", "master_plan.json");
+        }
+
+        private static string GetExportWorldPath()
+        {
+            return Path.Combine(Application.dataPath, "..", "exported_world.json");
+        }
+
+        private static string GetImportWorldPath()
+        {
+            return Path.Combine(Application.dataPath, "..", "exported_world.json");
         }
 
         public void GenerateTerrain()
@@ -156,10 +179,15 @@ namespace ZZCityGen.Generation
 
         public void GenerateTransport()
         {
+            GenerateRoads();
+        }
+
+        public void GenerateRoads()
+        {
             EnsurePlan();
             EnsureRoot();
-            ClearChildren("Transport");
-            var transportRoot = CreateStageRoot("Transport");
+            ClearChildren("Roads");
+            var roadsRoot = CreateStageRoot("Roads");
 
             var roadNetworkPath = GetRoadNetworkPath();
             WorldSaveUtility.SaveRoadNetwork(currentPlan.roadNetwork, roadNetworkPath);
@@ -169,7 +197,7 @@ namespace ZZCityGen.Generation
             {
                 var road = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 road.name = link.name;
-                road.transform.SetParent(transportRoot, false);
+                road.transform.SetParent(roadsRoot, false);
                 var from = ToWorld(link.from, 0.25f);
                 var to = ToWorld(link.to, 0.25f);
                 road.transform.position = (from + to) * 0.5f;
@@ -181,7 +209,7 @@ namespace ZZCityGen.Generation
             {
                 var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 marker.name = intersection.name;
-                marker.transform.SetParent(transportRoot, false);
+                marker.transform.SetParent(roadsRoot, false);
                 marker.transform.position = ToWorld(intersection.position, 0.35f);
                 marker.transform.localScale = Vector3.one * 12f;
             }
@@ -190,9 +218,62 @@ namespace ZZCityGen.Generation
             {
                 var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 marker.name = roundabout.name;
-                marker.transform.SetParent(transportRoot, false);
+                marker.transform.SetParent(roadsRoot, false);
                 marker.transform.position = ToWorld(roundabout.center, 0.12f);
                 marker.transform.localScale = new Vector3(roundabout.radiusMeters * 0.10f, 0.2f, roundabout.radiusMeters * 0.10f);
+            }
+        }
+
+        public void GenerateDistricts()
+        {
+            EnsurePlan();
+            EnsureRoot();
+            ClearChildren("Districts");
+            var districtRoot = CreateStageRoot("Districts");
+
+            foreach (var city in currentPlan.cities)
+            {
+                foreach (var district in city.districts)
+                {
+                    var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    marker.name = district.name;
+                    marker.transform.SetParent(districtRoot, false);
+                    marker.transform.position = ToWorld(district.bounds.center, 0.1f);
+                    marker.transform.localScale = new Vector3(district.bounds.width * 0.92f, 1f, district.bounds.height * 0.92f);
+                    ApplyColor(marker, new Color(0.6f, 0.6f, 0.9f, 0.4f));
+                }
+            }
+        }
+
+        public void GenerateLots()
+        {
+            EnsurePlan();
+            EnsureRoot();
+            ClearChildren("Lots");
+            var lotsRoot = CreateStageRoot("Lots");
+
+            foreach (var city in currentPlan.cities)
+            {
+                foreach (var district in city.districts)
+                {
+                    if (district.lots == null)
+                    {
+                        continue;
+                    }
+
+                    var districtRoot = new GameObject(district.name);
+                    districtRoot.transform.SetParent(lotsRoot, false);
+
+                    foreach (var lot in district.lots)
+                    {
+                        var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        marker.name = lot.name;
+                        marker.transform.SetParent(districtRoot.transform, false);
+                        marker.transform.position = ToWorld(lot.center, 0.1f);
+                        marker.transform.localScale = new Vector3(lot.widthMeters * 0.7f, 0.5f, lot.lengthMeters * 0.7f);
+                        ApplyColor(marker, new Color(0.8f, 0.8f, 0.5f, 0.45f));
+                    }
+                }
             }
         }
 
@@ -316,10 +397,207 @@ namespace ZZCityGen.Generation
         public void ConfigureSimulation()
         {
             EnsurePlan();
+            EnsureRoot();
             EnsureRuntimeSystems();
             economySimulator.Configure(currentPlan, settings);
+            populationSimulator.Configure(currentPlan, settings);
             trafficSimulator.Configure(currentPlan, settings);
+            trafficSystem = GetComponent<TrafficSystem>() ?? gameObject.AddComponent<TrafficSystem>();
+            trafficSystem.Configure(currentPlan, settings);
+            chunkSystem.Configure(settings, generatedRoot);
+            streamingSystem.Configure(settings, chunkSystem, streamingController, Camera.main);
+            occlusionCullingSystem.Configure(settings, chunkSystem, Camera.main);
             streamingController.Configure(settings, currentPlan);
+        }
+
+        public void SaveWorld()
+        {
+            EnsurePlan();
+            EnsureRuntimeSystems();
+            saveSystem.SaveMasterPlan(currentPlan, GetMasterPlanPath());
+            saveSystem.SaveWorldPlan(currentPlan.worldPlan, GetWorldPlanPath());
+            Debug.Log($"World saved to {GetMasterPlanPath()} and {GetWorldPlanPath()}");
+        }
+
+        public void LoadWorld()
+        {
+            EnsureRuntimeSystems();
+            var loaded = loadSystem.LoadMasterPlan(GetMasterPlanPath());
+            if (loaded == null)
+            {
+                Debug.LogWarning($"Load failed: master plan not found at {GetMasterPlanPath()}");
+                return;
+            }
+
+            currentPlan = loaded;
+            currentPlan.worldPlan = WorldPlan.FromMasterPlan(currentPlan);
+            Debug.Log($"Master plan loaded from {GetMasterPlanPath()}");
+            RegenerateLoadedWorld();
+        }
+
+        public void ExportWorld()
+        {
+            EnsurePlan();
+            EnsureRuntimeSystems();
+            saveSystem.ExportWorldPlan(currentPlan.worldPlan, GetExportWorldPath());
+            Debug.Log($"World exported to {GetExportWorldPath()}");
+        }
+
+        public void ImportWorld()
+        {
+            EnsureRuntimeSystems();
+            var importedWorld = loadSystem.LoadWorldPlan(GetExportWorldPath());
+            if (importedWorld == null)
+            {
+                Debug.LogWarning($"Import failed: exported world not found at {GetExportWorldPath()}");
+                return;
+            }
+
+            currentPlan = loadSystem.ReconstructMasterPlan(importedWorld, settings);
+            currentPlan.worldPlan = importedWorld;
+            Debug.Log($"World imported from {GetExportWorldPath()}");
+            RegenerateLoadedWorld();
+        }
+
+        private void RegenerateLoadedWorld()
+        {
+            EnsureRoot();
+            ClearChildren("Terrain");
+            ClearChildren("Cities");
+            ClearChildren("Buildings");
+            ClearChildren("Transport");
+            ClearChildren("Parks");
+            ClearChildren("Infrastructure");
+            ClearChildren("Traffic System");
+            ClearChildren("Population");
+
+            GenerateTerrain();
+            GenerateCities();
+            GenerateBuildings();
+            GenerateTransport();
+            GenerateParks();
+            GenerateInfrastructure();
+            GenerateTrafficSystem();
+            GeneratePopulation();
+            ConfigureSimulation();
+            OptimizeWorld();
+        }
+
+        public void GenerateTrafficSystem()
+        {
+            EnsurePlan();
+            EnsureRoot();
+            ClearChildren("Traffic System");
+            var trafficRoot = CreateStageRoot("Traffic System");
+            if (currentPlan.trafficRoutes == null || currentPlan.trafficRoutes.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var route in currentPlan.trafficRoutes)
+            {
+                var routeObject = new GameObject(route.name);
+                routeObject.transform.SetParent(trafficRoot, false);
+                var routeColor = GetTrafficRouteColor(route.type);
+                var routeHeight = GetTrafficRouteHeight(route.type);
+
+                for (var index = 0; index < route.pathPoints.Count - 1; index++)
+                {
+                    var start = ToWorld(route.pathPoints[index], routeHeight);
+                    var end = ToWorld(route.pathPoints[index + 1], routeHeight);
+                    var segment = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    segment.name = route.name + $" Segment {index + 1}";
+                    segment.transform.SetParent(routeObject.transform, false);
+                    segment.transform.position = (start + end) * 0.5f;
+                    segment.transform.LookAt(end);
+                    segment.transform.localScale = new Vector3(0.25f, 0.1f, Vector3.Distance(start, end));
+                    ApplyColor(segment, routeColor);
+                }
+
+                var vehicle = GameObject.CreatePrimitive(GetTrafficRoutePrimitive(route.type));
+                vehicle.name = route.name + " Vehicle";
+                vehicle.transform.SetParent(routeObject.transform, false);
+                vehicle.transform.position = ToWorld(route.pathPoints[0], routeHeight + 0.35f);
+                vehicle.transform.localScale = Vector3.one * 1.2f;
+                ApplyColor(vehicle, routeColor);
+            }
+        }
+
+        public void GeneratePopulation()
+        {
+            EnsurePlan();
+            EnsureRoot();
+            ClearChildren("Population");
+            var populationRoot = CreateStageRoot("Population");
+
+            foreach (var cluster in currentPlan.populationClusters)
+            {
+                var marker = GameObject.CreatePrimitive(cluster.role == PopulationClusterRole.Residence ? PrimitiveType.Sphere : PrimitiveType.Capsule);
+                marker.name = cluster.name;
+                marker.transform.SetParent(populationRoot, false);
+                marker.transform.position = ToWorld(cluster.center, 0.6f);
+                marker.transform.localScale = Vector3.one * Mathf.Lerp(8f, 24f, Mathf.Clamp01(cluster.residentPopulation / 4800f));
+                ApplyColor(marker, cluster.role == PopulationClusterRole.Residence ? new Color(0.2f, 0.8f, 0.4f, 1f) : new Color(0.8f, 0.4f, 0.2f, 1f));
+            }
+
+            foreach (var route in currentPlan.pedestrianRoutes)
+            {
+                var routeObject = new GameObject(route.name);
+                routeObject.transform.SetParent(populationRoot, false);
+                for (var index = 0; index < route.pathPoints.Count - 1; index++)
+                {
+                    var start = ToWorld(route.pathPoints[index], 0.08f);
+                    var end = ToWorld(route.pathPoints[index + 1], 0.08f);
+                    var segment = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    segment.name = route.name + $" Segment {index + 1}";
+                    segment.transform.SetParent(routeObject.transform, false);
+                    segment.transform.position = (start + end) * 0.5f;
+                    segment.transform.LookAt(end);
+                    segment.transform.localScale = new Vector3(0.15f, 0.05f, Vector3.Distance(start, end));
+                    ApplyColor(segment, Color.white);
+                }
+            }
+        }
+
+        public void GeneratePerformance()
+        {
+            EnsurePlan();
+            EnsureRoot();
+            EnsureRuntimeSystems();
+            ClearChildren("Performance");
+
+            chunkSystem.Configure(settings, generatedRoot);
+            chunkSystem.BuildChunks(generatedRoot);
+
+            if (settings.enableLodSystem)
+            {
+                lodGenerator.Configure(settings, currentPlan);
+                lodGenerator.GenerateLods(generatedRoot);
+            }
+
+            streamingSystem.Configure(settings, chunkSystem, streamingController, Camera.main);
+            occlusionCullingSystem.Configure(settings, chunkSystem, Camera.main);
+        }
+
+        public void GenerateAll()
+        {
+            GenerateEntireWorld();
+        }
+
+        public void GenerateEntireWorld()
+        {
+            GenerateMasterPlan();
+            GenerateTerrain();
+            GenerateRoads();
+            GenerateCities();
+            GenerateDistricts();
+            GenerateLots();
+            GenerateParks();
+            GenerateBuildings();
+            GenerateInfrastructure();
+            GenerateTrafficSystem();
+            OptimizeWorld();
+            SaveWorld();
         }
 
         public void OptimizeWorld()
@@ -341,6 +619,8 @@ namespace ZZCityGen.Generation
             GenerateParks();
             GenerateInfrastructure();
             GenerateTrafficSystem();
+            GeneratePopulation();
+            GeneratePerformance();
             ConfigureSimulation();
             OptimizeWorld();
         }
@@ -637,8 +917,63 @@ namespace ZZCityGen.Generation
                 case TransportType.Metro:
                 case TransportType.Tram:
                     return 7f;
+                case TransportType.Bus:
+                    return 6f;
+                case TransportType.Car:
+                    return 5f;
                 default:
                     return 10f;
+            }
+        }
+
+        private Color GetTrafficRouteColor(TransportType type)
+        {
+            switch (type)
+            {
+                case TransportType.Car:
+                    return Color.gray;
+                case TransportType.Bus:
+                    return Color.red;
+                case TransportType.Rail:
+                    return Color.blue;
+                case TransportType.Metro:
+                    return new Color(0.2f, 0.8f, 1f, 1f);
+                default:
+                    return Color.white;
+            }
+        }
+
+        private PrimitiveType GetTrafficRoutePrimitive(TransportType type)
+        {
+            switch (type)
+            {
+                case TransportType.Car:
+                    return PrimitiveType.Sphere;
+                case TransportType.Bus:
+                    return PrimitiveType.Cube;
+                case TransportType.Rail:
+                    return PrimitiveType.Cylinder;
+                case TransportType.Metro:
+                    return PrimitiveType.Capsule;
+                default:
+                    return PrimitiveType.Sphere;
+            }
+        }
+
+        private float GetTrafficRouteHeight(TransportType type)
+        {
+            switch (type)
+            {
+                case TransportType.Car:
+                    return 0.12f;
+                case TransportType.Bus:
+                    return 0.18f;
+                case TransportType.Rail:
+                    return 0.22f;
+                case TransportType.Metro:
+                    return 0.26f;
+                default:
+                    return 0.1f;
             }
         }
 
@@ -669,7 +1004,14 @@ namespace ZZCityGen.Generation
         private void EnsureRuntimeSystems()
         {
             streamingController = GetComponent<ChunkStreamingController>() ?? gameObject.AddComponent<ChunkStreamingController>();
+            chunkSystem = GetComponent<ChunkSystem>() ?? gameObject.AddComponent<ChunkSystem>();
+            streamingSystem = GetComponent<StreamingSystem>() ?? gameObject.AddComponent<StreamingSystem>();
+            lodGenerator = GetComponent<LODGenerator>() ?? gameObject.AddComponent<LODGenerator>();
+            occlusionCullingSystem = GetComponent<OcclusionCullingSystem>() ?? gameObject.AddComponent<OcclusionCullingSystem>();
+            saveSystem = GetComponent<SaveSystem>() ?? gameObject.AddComponent<SaveSystem>();
+            loadSystem = GetComponent<LoadSystem>() ?? gameObject.AddComponent<LoadSystem>();
             economySimulator = GetComponent<EconomySimulator>() ?? gameObject.AddComponent<EconomySimulator>();
+            populationSimulator = GetComponent<PopulationSimulator>() ?? gameObject.AddComponent<PopulationSimulator>();
             trafficSimulator = GetComponent<TrafficSimulator>() ?? gameObject.AddComponent<TrafficSimulator>();
             pluginRegistry = GetComponent<PluginRegistry>() ?? gameObject.AddComponent<PluginRegistry>();
         }

@@ -83,9 +83,16 @@ namespace ZZCityGen.Data
         [Header("Runtime")]
         public bool enableEconomySimulation = true;
         public bool enableTrafficSimulation = true;
+        public bool enablePopulationSimulation = true;
+        public bool enablePedestrianSimulation = true;
+        public bool enableChunkSystem = true;
+        public bool enableStreamingSystem = true;
+        public bool enableLodSystem = true;
+        public bool enableOcclusionCulling = true;
         public bool enableDynamicGrowth = true;
         public int activeChunkRadius = 3;
         public int lodLevels = 4;
+        public float occlusionRefreshInterval = 0.25f;
 
         public int WorldSizeMeters => Mathf.Max(1, worldSizeInChunks) * Mathf.Max(1, chunkSizeMeters);
     }

@@ -38,6 +38,7 @@ namespace ZZCityGen.Planning
             BuildTransport(plan);
             BuildEconomy(plan);
             BuildInfrastructure(plan);
+            BuildPopulationPlan(plan);
             BuildLandmarks(plan);
             BuildPlanningRecommendations(plan);
             BuildGrowthPhases(plan);
@@ -875,6 +876,96 @@ namespace ZZCityGen.Planning
             plan.economy.publicServiceJobs = Mathf.RoundToInt(plan.economy.estimatedJobs * 0.18f);
             plan.economy.industrialJobs = Mathf.RoundToInt(plan.economy.estimatedJobs * 0.22f);
             plan.economy.tourismJobs = Mathf.RoundToInt(plan.economy.estimatedJobs * 0.08f);
+        }
+
+        private void BuildPopulationPlan(MasterPlan plan)
+        {
+            if (!settings.enablePopulationSimulation)
+            {
+                return;
+            }
+
+            plan.populationClusters.Clear();
+            plan.pedestrianRoutes.Clear();
+
+            foreach (var city in plan.cities)
+            {
+                var residentialClusters = new List<PopulationClusterPlan>();
+                var workplaceClusters = new List<PopulationClusterPlan>();
+
+                foreach (var district in city.districts)
+                {
+                    if (district.populationTarget > 0 && (district.type == DistrictType.MiddleResidential || district.type == DistrictType.PopularResidential || district.type == DistrictType.LuxuryResidential || district.type == DistrictType.Residential))
+                    {
+                        var cluster = new PopulationClusterPlan
+                        {
+                            name = names.NextRegionName(plan.populationClusters.Count),
+                            cityName = city.name,
+                            districtName = district.name,
+                            role = PopulationClusterRole.Residence,
+                            center = district.bounds.center,
+                            residentPopulation = district.populationTarget,
+                            jobCapacity = Mathf.Max(0, district.jobsTarget),
+                            footTrafficIndex = Mathf.Clamp01(district.populationTarget / 7200f)
+                        };
+                        residentialClusters.Add(cluster);
+                        plan.populationClusters.Add(cluster);
+                    }
+
+                    if (district.jobsTarget > 0 && (district.type == DistrictType.Business || district.type == DistrictType.Industrial || district.type == DistrictType.Tourism || district.type == DistrictType.Education || district.type == DistrictType.Government || district.type == DistrictType.Port || district.type == DistrictType.Airport || district.type == DistrictType.FreightTerminal))
+                    {
+                        var cluster = new PopulationClusterPlan
+                        {
+                            name = names.NextRegionName(plan.populationClusters.Count),
+                            cityName = city.name,
+                            districtName = district.name,
+                            role = PopulationClusterRole.Employment,
+                            center = district.bounds.center,
+                            residentPopulation = 0,
+                            jobCapacity = district.jobsTarget,
+                            footTrafficIndex = Mathf.Clamp01(district.jobsTarget / 7200f)
+                        };
+                        workplaceClusters.Add(cluster);
+                        plan.populationClusters.Add(cluster);
+                    }
+                }
+
+                foreach (var residence in residentialClusters)
+                {
+                    var nearestWork = FindNearestCluster(workplaceClusters, residence.center);
+                    if (nearestWork == null)
+                    {
+                        continue;
+                    }
+
+                    plan.pedestrianRoutes.Add(new PedestrianRoutePlan
+                    {
+                        name = names.NextInfrastructureName("PedestrianRoute", city.name),
+                        cityName = city.name,
+                        originClusterName = residence.name,
+                        destinationClusterName = nearestWork.name,
+                        pathPoints = new List<Vector2> { residence.center, nearestWork.center },
+                        footTrafficIndex = Mathf.Clamp01((residence.residentPopulation + nearestWork.jobCapacity) / 12000f)
+                    });
+                }
+            }
+        }
+
+        private PopulationClusterPlan FindNearestCluster(List<PopulationClusterPlan> clusters, Vector2 position)
+        {
+            PopulationClusterPlan nearest = null;
+            var bestDistance = float.MaxValue;
+            foreach (var cluster in clusters)
+            {
+                var distance = Vector2.SqrMagnitude(cluster.center - position);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    nearest = cluster;
+                }
+            }
+
+            return nearest;
         }
 
         private List<DistrictType> GetDistrictRecipe(CityArchetype archetype)

@@ -55,6 +55,11 @@ namespace ZZCityGen.Data
         [Range(0f, 1f)] public float waterAmount = 0.22f;
         [Range(0f, 1f)] public float desertAmount = 0.08f;
 
+        [Header("AI Planning")]
+        public bool enableAiSitePlanning = true;
+        [Range(4, 32)] public int planningAnalysisGridSize = 12;
+        [Range(0, 100)] public int growthSimulationYears = 30;
+
         [Header("Transport")]
         public bool generateHighways = true;
         public bool generateRail = true;

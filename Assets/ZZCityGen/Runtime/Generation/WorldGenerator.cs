@@ -7,6 +7,12 @@ using ZZCityGen.Planning;
 using ZZCityGen.Plugins;
 using ZZCityGen.Simulation;
 using ZZCityGen.Streaming;
+using ZZCityGen.WorldGenerator.Core.Settings;
+using ZZCityGen.WorldGenerator.Core;
+using ZZCityGen.WorldGenerator.Core.Logging;
+using ZZCityGen.WorldGenerator.Core.Events;
+using ZZCityGen.WorldGenerator.Core.Validation;
+using ZZCityGen.WorldGenerator.Generators.MasterPlan;
 
 namespace ZZCityGen.Generation
 {
@@ -17,6 +23,7 @@ namespace ZZCityGen.Generation
         [SerializeField] private AssetCatalog assetCatalog;
         [SerializeField] private PrefabDatabase prefabDatabase;
         [SerializeField] private Transform generatedRoot;
+        [SerializeField] private WorldSettings worldSettings;
 
         private MasterPlan currentPlan;
         private ChunkStreamingController streamingController;
@@ -31,19 +38,45 @@ namespace ZZCityGen.Generation
         private TrafficSimulator trafficSimulator;
         private TrafficSystem trafficSystem;
         private PluginRegistry pluginRegistry;
+        private MasterDatabase masterDatabase;
+        private MasterPlanGenerator masterPlanGenerator;
 
         public WorldGenerationSettings Settings => settings;
         public MasterPlan CurrentPlan => currentPlan;
 
         public void GenerateMasterPlan()
         {
-            currentPlan = new MasterPlanBuilder(settings).Build();
+            GeneratorLogger.Info("WorldGenerator", "Starting GenerateMasterPlan");
+
+            // Ensure core runtime pieces exist
             EnsureRuntimeSystems();
+
+            // Initialize master database and optional generator adapter
+            if (masterDatabase == null) masterDatabase = new MasterDatabase();
+            if (worldSettings != null && masterPlanGenerator == null) masterPlanGenerator = new MasterPlanGenerator(masterDatabase, worldSettings);
+
+            // Allow the new generator (stub) to run and emit events
+            masterPlanGenerator?.Build();
+
+            // Fallback to existing robust builder for now
+            currentPlan = new MasterPlanBuilder(settings).Build();
+
+            // Validate plan before proceeding
+            var validationResult = Validator.Validate(currentPlan);
+            if (!validationResult.IsValid)
+            {
+                foreach (var m in validationResult.Messages) GeneratorLogger.Error("Validation", m);
+                GeneratorLogger.Error("WorldGenerator", "Master plan failed validation — aborting generation.");
+                EventBus.Publish("WorldGenerator:MasterPlanFailed", validationResult);
+                return;
+            }
+
             pluginRegistry.ApplyMasterPlanExtensions(currentPlan, settings);
             currentPlan.worldPlan = WorldPlan.FromMasterPlan(currentPlan);
             var path = GetWorldPlanPath();
             WorldSaveUtility.SaveWorldPlan(currentPlan.worldPlan, path);
-            Debug.Log($"World plan saved to {path}");
+            GeneratorLogger.Info("WorldGenerator", $"World plan saved to {path}");
+            EventBus.Publish("WorldGenerator:MasterPlanComplete", currentPlan);
         }
 
         private static string GetWorldPlanPath()

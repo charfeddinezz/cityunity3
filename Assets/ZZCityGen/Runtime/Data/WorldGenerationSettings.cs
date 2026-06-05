@@ -64,6 +64,8 @@ namespace ZZCityGen.Data
         public bool generateHighways = true;
         public bool generateRail = true;
         public bool generateMetro = true;
+        public bool generateStreets = true;
+        public bool generateRoundabouts = true;
         public bool generateAirports = true;
         public bool generatePorts = true;
         public bool generateBridgesAndTunnels = true;

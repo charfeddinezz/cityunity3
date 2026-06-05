@@ -28,7 +28,7 @@ namespace ZZCityGen.Editor
 
             using (new EditorGUI.DisabledScope(generator == null))
             {
-                DrawStageButton("1. Build Master Plan", () => generator.GenerateMasterPlan());
+                DrawStageButton("1. Generate Master Plan", () => generator.GenerateMasterPlan());
                 DrawStageButton("2. Generate Terrain", () => generator.GenerateTerrain());
                 DrawStageButton("3. Generate Cities & Districts", () => generator.GenerateCities());
                 DrawStageButton("4. Generate Transport", () => generator.GenerateTransport());

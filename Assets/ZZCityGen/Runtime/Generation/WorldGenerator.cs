@@ -1,4 +1,6 @@
+using System.IO;
 using UnityEngine;
+using ZZCityGen.Core;
 using ZZCityGen.Data;
 using ZZCityGen.Planning;
 using ZZCityGen.Plugins;
@@ -28,6 +30,30 @@ namespace ZZCityGen.Generation
             currentPlan = new MasterPlanBuilder(settings).Build();
             EnsureRuntimeSystems();
             pluginRegistry.ApplyMasterPlanExtensions(currentPlan, settings);
+            currentPlan.worldPlan = WorldPlan.FromMasterPlan(currentPlan);
+            var path = GetWorldPlanPath();
+            WorldSaveUtility.SaveWorldPlan(currentPlan.worldPlan, path);
+            Debug.Log($"World plan saved to {path}");
+        }
+
+        private static string GetWorldPlanPath()
+        {
+            return Path.Combine(Application.dataPath, "..", "world_plan.json");
+        }
+
+        private static string GetTerrainPlanPath()
+        {
+            return Path.Combine(Application.dataPath, "..", "terrain_data.json");
+        }
+
+        private static string GetRoadNetworkPath()
+        {
+            return Path.Combine(Application.dataPath, "..", "road_network.json");
+        }
+
+        private static string GetCityDataPath()
+        {
+            return Path.Combine(Application.dataPath, "..", "city_data.json");
         }
 
         public void GenerateTerrain()
@@ -36,6 +62,10 @@ namespace ZZCityGen.Generation
             EnsureRoot();
             ClearChildren("Terrain");
             var terrainRoot = CreateStageRoot("Terrain");
+
+            var terrainPath = GetTerrainPlanPath();
+            WorldSaveUtility.SaveTerrainPlan(currentPlan.terrainPlan, terrainPath);
+            Debug.Log($"Terrain data saved to {terrainPath}");
 
             foreach (var feature in currentPlan.naturalFeatures)
             {
@@ -69,6 +99,10 @@ namespace ZZCityGen.Generation
             ClearChildren("Cities");
             var cityRoot = CreateStageRoot("Cities");
 
+            var cityDataPath = GetCityDataPath();
+            WorldSaveUtility.SaveCityData(new CityDataPackage { cities = currentPlan.cities }, cityDataPath);
+            Debug.Log($"City data saved to {cityDataPath}");
+
             foreach (var city in currentPlan.cities)
             {
                 var cityObject = new GameObject(city.name);
@@ -89,6 +123,10 @@ namespace ZZCityGen.Generation
             ClearChildren("Transport");
             var transportRoot = CreateStageRoot("Transport");
 
+            var roadNetworkPath = GetRoadNetworkPath();
+            WorldSaveUtility.SaveRoadNetwork(currentPlan.roadNetwork, roadNetworkPath);
+            Debug.Log($"Road network saved to {roadNetworkPath}");
+
             foreach (var link in currentPlan.transportLinks)
             {
                 var road = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -99,6 +137,24 @@ namespace ZZCityGen.Generation
                 road.transform.position = (from + to) * 0.5f;
                 road.transform.LookAt(to);
                 road.transform.localScale = new Vector3(GetTransportWidth(link.type), 0.5f, Vector3.Distance(from, to));
+            }
+
+            foreach (var intersection in currentPlan.roadNetwork.Intersections)
+            {
+                var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                marker.name = intersection.name;
+                marker.transform.SetParent(transportRoot, false);
+                marker.transform.position = ToWorld(intersection.position, 0.35f);
+                marker.transform.localScale = Vector3.one * 12f;
+            }
+
+            foreach (var roundabout in currentPlan.roadNetwork.Roundabouts)
+            {
+                var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                marker.name = roundabout.name;
+                marker.transform.SetParent(transportRoot, false);
+                marker.transform.position = ToWorld(roundabout.center, 0.12f);
+                marker.transform.localScale = new Vector3(roundabout.radiusMeters * 0.10f, 0.2f, roundabout.radiusMeters * 0.10f);
             }
         }
 
@@ -194,13 +250,22 @@ namespace ZZCityGen.Generation
             districtObject.transform.SetParent(cityRoot, false);
             districtObject.transform.position = ToWorld(district.bounds.center, 0f);
 
+            if (district.lots != null && district.lots.Count > 0)
+            {
+                foreach (var lot in district.lots)
+                {
+                    GenerateLot(districtObject.transform, district, lot);
+                }
+                return;
+            }
+
             var lotsPerAxis = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(2f, 9f, district.density)), 1, 16);
             var lotSize = new Vector2(district.bounds.width / lotsPerAxis, district.bounds.height / lotsPerAxis);
             for (var x = 0; x < lotsPerAxis; x++)
             {
                 for (var y = 0; y < lotsPerAxis; y++)
                 {
-                    if (district.type == DistrictType.PublicPark && (x + y) % 3 != 0)
+                    if ((district.type == DistrictType.PublicPark || district.type == DistrictType.Park) && (x + y) % 3 != 0)
                     {
                         continue;
                     }
@@ -211,6 +276,12 @@ namespace ZZCityGen.Generation
                     PlaceLot(districtObject.transform, district, localPosition, lotSize);
                 }
             }
+        }
+
+        private void GenerateLot(Transform districtRoot, DistrictPlan district, LotPlan lot)
+        {
+            var lotSize = new Vector2(lot.widthMeters, lot.lengthMeters);
+            PlaceLot(districtRoot, district, lot.center, lotSize);
         }
 
         private void PlaceLot(Transform districtRoot, DistrictPlan district, Vector2 position, Vector2 lotSize)
@@ -224,7 +295,8 @@ namespace ZZCityGen.Generation
             }
             else
             {
-                instance = GameObject.CreatePrimitive(district.type == DistrictType.PublicPark ? PrimitiveType.Sphere : PrimitiveType.Cube);
+                var isPark = district.type == DistrictType.PublicPark || district.type == DistrictType.Park;
+                instance = GameObject.CreatePrimitive(isPark ? PrimitiveType.Sphere : PrimitiveType.Cube);
                 instance.transform.SetParent(districtRoot, false);
                 instance.name = $"{district.type} Lot";
                 var height = GetDistrictHeight(district);
@@ -246,6 +318,7 @@ namespace ZZCityGen.Generation
                 case DistrictType.Utility:
                     return Mathf.Lerp(6f, 28f, district.development);
                 case DistrictType.PublicPark:
+                case DistrictType.Park:
                     return Mathf.Lerp(3f, 18f, district.development);
                 default:
                     return Mathf.Lerp(4f, 42f, district.development);
@@ -289,6 +362,10 @@ namespace ZZCityGen.Generation
             {
                 case TransportType.Highway:
                     return 18f;
+                case TransportType.MainStreet:
+                    return 12f;
+                case TransportType.SecondaryStreet:
+                    return 7f;
                 case TransportType.Rail:
                 case TransportType.Metro:
                 case TransportType.Tram:

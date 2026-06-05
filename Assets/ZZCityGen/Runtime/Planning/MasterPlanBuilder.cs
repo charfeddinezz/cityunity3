@@ -29,6 +29,7 @@ namespace ZZCityGen.Planning
             };
 
             BuildRegions(plan);
+            plan.terrainPlan = new TerrainGenerator(settings, settings.worldSeed).BuildTerrainPlan(plan.worldSizeMeters);
             BuildNaturalFeatures(plan);
             BuildTerrainAnalysis(plan);
             BuildCities(plan);
@@ -66,36 +67,13 @@ namespace ZZCityGen.Planning
 
         private void BuildCities(MasterPlan plan)
         {
-            var center = plan.worldSizeMeters * 0.5f;
-            var capitalPopulation = Mathf.RoundToInt(settings.targetPopulation * 0.36f);
-            var capital = CreateCity(0, CityArchetype.CapitalMegacity, center, capitalPopulation, settings.WorldSizeMeters * 0.08f);
-            plan.cities.Add(capital);
-            ReserveSite(plan, SitePurpose.Capital, capital.name, capital.position, capital.radiusMeters, 1f);
-
-            var archetypes = new[]
+            var cityGenerator = new CityGenerator(settings, random, names);
+            var generatedCities = cityGenerator.BuildCities(plan);
+            foreach (var city in generatedCities)
             {
-                CityArchetype.FamilySuburb,
-                CityArchetype.RuralTown,
-                CityArchetype.IndustrialCity,
-                CityArchetype.CoastalCity,
-                CityArchetype.TourismCity,
-                CityArchetype.UniversityCity
-            };
-
-            for (var i = 1; i < settings.cityCount; i++)
-            {
-                var angle = (Mathf.PI * 2f * i / Mathf.Max(1, settings.cityCount - 1)) + Range(-0.3f, 0.3f);
-                var distance = settings.WorldSizeMeters * Range(0.18f, 0.46f);
-                var position = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distance;
-                var archetype = archetypes[i % archetypes.Length];
-                var population = Mathf.Max(1000, Mathf.RoundToInt(settings.targetPopulation * Range(0.015f, 0.07f)));
-                var radius = Mathf.Lerp(650f, 4500f, settings.urbanDensity) * Range(0.75f, 1.35f);
-                position = settings.enableAiSitePlanning
-                    ? PickBestSite(plan, SitePurpose.City, position, radius * 2f, plan.worldSizeMeters)
-                    : ClampToWorld(position, plan.worldSizeMeters);
-                var city = CreateCity(i, archetype, position, population, radius);
                 plan.cities.Add(city);
-                ReserveSite(plan, SitePurpose.City, city.name, city.position, city.radiusMeters, ScorePosition(plan, SitePurpose.City, city.position));
+                var score = city.archetype == CityArchetype.CapitalMegacity ? 1f : ScorePosition(plan, SitePurpose.City, city.position);
+                ReserveSite(plan, city.archetype == CityArchetype.CapitalMegacity ? SitePurpose.Capital : SitePurpose.City, city.name, city.position, city.radiusMeters, score);
             }
         }
 
@@ -176,22 +154,64 @@ namespace ZZCityGen.Planning
 
         private void BuildNaturalFeatures(MasterPlan plan)
         {
-            var featureCount = Mathf.Max(4, settings.worldSizeInChunks / 8);
-            for (var i = 0; i < featureCount; i++)
+            foreach (var mountain in plan.terrainPlan.mountains)
             {
-                var river = random.NextDouble() < settings.waterAmount;
-                var type = river ? "River" : PickFeatureType();
-                var start = RandomWorldPoint(plan.worldSizeMeters);
-                var end = river ? DownhillEndpoint(start, plan.worldSizeMeters) : start;
                 plan.naturalFeatures.Add(new NaturalFeaturePlan
                 {
-                    name = names.NextFeatureName(type, i),
-                    featureType = type,
-                    start = start,
-                    end = end,
-                    widthOrRadius = river ? Range(18f, 90f) : Range(300f, 2600f),
-                    startElevation = SampleElevation(start.x / Mathf.Max(1f, plan.worldSizeMeters.x), start.y / Mathf.Max(1f, plan.worldSizeMeters.y)),
-                    endElevation = river ? Mathf.Max(0f, SampleElevation(start.x / Mathf.Max(1f, plan.worldSizeMeters.x), start.y / Mathf.Max(1f, plan.worldSizeMeters.y)) - Range(0.08f, 0.32f)) : SampleElevation(end.x / Mathf.Max(1f, plan.worldSizeMeters.x), end.y / Mathf.Max(1f, plan.worldSizeMeters.y))
+                    name = mountain.name,
+                    featureType = "MountainRange",
+                    start = mountain.start,
+                    end = mountain.end,
+                    widthOrRadius = mountain.widthMeters,
+                    startElevation = mountain.peakElevation,
+                    endElevation = mountain.peakElevation
+                });
+            }
+
+            foreach (var valley in plan.terrainPlan.valleys)
+            {
+                plan.naturalFeatures.Add(new NaturalFeaturePlan
+                {
+                    name = valley.name,
+                    featureType = "Valley",
+                    start = valley.start,
+                    end = valley.end,
+                    widthOrRadius = valley.widthMeters,
+                    startElevation = Mathf.Max(0f, 0.18f - valley.depth * 0.12f),
+                    endElevation = Mathf.Max(0f, 0.18f - valley.depth * 0.12f)
+                });
+            }
+
+            foreach (var river in plan.terrainPlan.rivers)
+            {
+                if (river.path.Count < 2)
+                {
+                    continue;
+                }
+
+                plan.naturalFeatures.Add(new NaturalFeaturePlan
+                {
+                    name = river.name,
+                    featureType = "River",
+                    start = river.path[0],
+                    end = river.path[river.path.Count - 1],
+                    widthOrRadius = river.widthMeters,
+                    startElevation = 0f,
+                    endElevation = 0f
+                });
+            }
+
+            foreach (var lake in plan.terrainPlan.lakes)
+            {
+                plan.naturalFeatures.Add(new NaturalFeaturePlan
+                {
+                    name = lake.name,
+                    featureType = "Lake",
+                    start = lake.center,
+                    end = lake.center,
+                    widthOrRadius = lake.radiusMeters,
+                    startElevation = lake.surfaceElevation,
+                    endElevation = lake.surfaceElevation
                 });
             }
         }
@@ -241,15 +261,38 @@ namespace ZZCityGen.Planning
                 return;
             }
 
+            if (settings.generateHighways)
+            {
+                plan.roadNetwork = new HighwayGenerator(settings, settings.worldSeed).BuildRoadNetwork(plan);
+                foreach (var highway in plan.roadNetwork.Highways)
+                {
+                    AddTransport(plan, TransportType.Highway, highway.from, highway.to, highway.name, highway.requiresBridge, highway.requiresTunnel);
+                }
+            }
+
+            if (settings.generateStreets)
+            {
+                var streetNetwork = new StreetGenerator(settings, settings.worldSeed).BuildStreetNetwork(plan);
+                plan.roadNetwork.MainStreets.AddRange(streetNetwork.MainStreets);
+                plan.roadNetwork.SecondaryStreets.AddRange(streetNetwork.SecondaryStreets);
+                plan.roadNetwork.Intersections.AddRange(streetNetwork.Intersections);
+                plan.roadNetwork.Roundabouts.AddRange(streetNetwork.Roundabouts);
+
+                foreach (var street in streetNetwork.MainStreets)
+                {
+                    AddTransport(plan, TransportType.MainStreet, street.from, street.to, street.name);
+                }
+
+                foreach (var street in streetNetwork.SecondaryStreets)
+                {
+                    AddTransport(plan, TransportType.SecondaryStreet, street.from, street.to, street.name);
+                }
+            }
+
             var capital = plan.cities[0];
             for (var i = 1; i < plan.cities.Count; i++)
             {
                 var city = plan.cities[i];
-                if (settings.generateHighways)
-                {
-                    AddTransport(plan, TransportType.Highway, capital.position, city.position, $"Highway {capital.name} - {city.name}");
-                }
-
                 if (settings.generateRail && i % 2 == 0)
                 {
                     AddTransport(plan, TransportType.Rail, capital.position, city.position, $"Rail {capital.name} - {city.name}");
@@ -478,18 +521,18 @@ namespace ZZCityGen.Planning
             }
         }
 
-        private void AddTransport(MasterPlan plan, TransportType type, Vector2 from, Vector2 to, string name)
+        private void AddTransport(MasterPlan plan, TransportType type, Vector2 from, Vector2 to, string name, bool? requiresBridge = null, bool? requiresTunnel = null)
         {
-            var crossesWater = settings.generateBridgesAndTunnels && random.NextDouble() < settings.waterAmount;
-            var crossesMountain = settings.generateBridgesAndTunnels && random.NextDouble() < settings.mountainAmount * 0.5f;
+            var bridge = requiresBridge ?? (settings.generateBridgesAndTunnels && random.NextDouble() < settings.waterAmount);
+            var tunnel = requiresTunnel ?? (settings.generateBridgesAndTunnels && random.NextDouble() < settings.mountainAmount * 0.5f);
             plan.transportLinks.Add(new TransportLinkPlan
             {
                 name = name,
                 type = type,
                 from = from,
                 to = to,
-                requiresBridge = crossesWater,
-                requiresTunnel = crossesMountain
+                requiresBridge = bridge,
+                requiresTunnel = tunnel
             });
         }
 
@@ -613,14 +656,6 @@ namespace ZZCityGen.Planning
             return Mathf.Max(0.02f, population * multiplier);
         }
 
-        private string PickFeatureType()
-        {
-            var roll = (float)random.NextDouble();
-            if (roll < settings.mountainAmount) return "MountainRange";
-            if (roll < settings.mountainAmount + settings.forestAmount) return "Forest";
-            if (roll < settings.mountainAmount + settings.forestAmount + settings.desertAmount) return "Desert";
-            return "Lake";
-        }
 
         private Vector2 PickBestSite(MasterPlan plan, SitePurpose purpose, Vector2 anchor, float minimumDistanceFromAnchor, Vector2 worldSize)
         {

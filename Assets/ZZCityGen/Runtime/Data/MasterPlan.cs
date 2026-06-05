@@ -18,13 +18,21 @@ namespace ZZCityGen.Data
         Port,
         Airport,
         FreightTerminal,
-        Utility
+        Utility,
+        Downtown,
+        Residential,
+        Commercial,
+        University,
+        Luxury,
+        Park
     }
 
     public enum TransportType
     {
         Highway,
         SecondaryRoad,
+        MainStreet,
+        SecondaryStreet,
         Rail,
         Metro,
         Tram,
@@ -61,6 +69,7 @@ namespace ZZCityGen.Data
         public Vector2 worldSizeMeters;
         public List<RegionPlan> regions = new List<RegionPlan>();
         public List<CityPlan> cities = new List<CityPlan>();
+        public TerrainPlan terrainPlan = new TerrainPlan();
         public List<NaturalFeaturePlan> naturalFeatures = new List<NaturalFeaturePlan>();
         public List<TerrainAnalysisCellPlan> terrainAnalysis = new List<TerrainAnalysisCellPlan>();
         public List<SiteReservationPlan> siteReservations = new List<SiteReservationPlan>();
@@ -71,6 +80,8 @@ namespace ZZCityGen.Data
         public List<MapLayerPlan> mapLayers = new List<MapLayerPlan>();
         public List<GrowthPhasePlan> growthPhases = new List<GrowthPhasePlan>();
         public EconomyPlan economy = new EconomyPlan();
+        public RoadNetworkPlan roadNetwork = new RoadNetworkPlan();
+        public WorldPlan worldPlan = new WorldPlan();
     }
 
     [Serializable]
@@ -89,10 +100,30 @@ namespace ZZCityGen.Data
         public string name;
         public CityArchetype archetype;
         public Vector2 position;
+        public Rect bounds;
         public float radiusMeters;
         public int populationTarget;
+        public int populationCurrent;
         public float development;
+        public CityEconomyPlan economy = new CityEconomyPlan();
         public List<DistrictPlan> districts = new List<DistrictPlan>();
+    }
+
+    [Serializable]
+    public sealed class CityEconomyPlan
+    {
+        public int residentPopulation;
+        public int jobsTotal;
+        public float averageIncome;
+        public float gdpMillions;
+        public float employmentRate;
+        public float productivityIndex;
+    }
+
+    [Serializable]
+    public sealed class CityDataPackage
+    {
+        public List<CityPlan> cities = new List<CityPlan>();
     }
 
     [Serializable]
@@ -107,6 +138,20 @@ namespace ZZCityGen.Data
         public float development;
         public float electricityMegawatts;
         public float waterMegalitersPerDay;
+        public List<LotPlan> lots = new List<LotPlan>();
+    }
+
+    [Serializable]
+    public sealed class LotPlan
+    {
+        public string name;
+        public string districtName;
+        public Vector2 center;
+        public float widthMeters;
+        public float lengthMeters;
+        public float areaSquareMeters;
+        public DistrictType zoneType;
+        public string plainText;
     }
 
     [Serializable]
